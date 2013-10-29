@@ -1,54 +1,61 @@
 #!/usr/bin/python
 # BDNYC database
-import sqlite3 as sql, numpy as np, matplotlib.pyplot as plt
+import io, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt
+from astrotools import utilities as u
 
-def get_db(dbpath, rows=False, modify=False):
-  '''
-  Creates a conection and cursor object with SQL database at *dbpath*
-  '''
-  con = sql.connect(dbpath, isolation_level=None)
-  con.text_factory = str
-  if rows: con.row_factory = sql.Row
-  return [con, con.cursor()] if modify else con.cursor()
-
-def spec_arrays(data, rows=False, SNR=False, plot=False):
-  '''
-  Converts database *data* from list of strings to numpy arrays. If *plot* it plots the spectrum.
-  '''
-  w, f, e = [np.array(map(float,i.split())) for i in [data['wavelength'], data['flux'], data['unc']]+([data['SNR']] if SNR else [])] if rows else [np.array(map(float,i.split())) for i in list(data)]
-  if plot:
-    plt.figure(), plt.loglog(w, f, c='b'), plt.fill_between(w, f-e, f+e, color='k', alpha=0.2), plt.xlim(0.4,3.0), plt.grid(True), plt.yscale('log',nonposy='clip')
-    if rows: plt.figtext(0.15,0.88,'{}\n{}\n{}\n{}'.format(data['filename'],data['telescope'],data['instrument'],data['obs_date']),verticalalignment='top')
-  return [w,f,e]
-
-def inventory(dbpath, ID='', plot=True):
-  '''
-  Prints a summary of all objects in the database at *dbpath*. If *ID* prints only that object's summary and plots if *plot*
-  '''
-  db = get_db(dbpath, rows=True)
-  if ID: D = db.execute("SELECT id, unum, shortname, ra, dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources WHERE id=?", [ID]).fetchall()
-  else: D = db.execute("SELECT id, unum, shortname, ra, dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources").fetchall()
-  if D:
-    printer(['id','unum','shortname','ra','dec','Spec Count','Phot Count','Parallax','SpT (opt)','SpT (IR)'], D)
-    if ID and plot: [spec_arrays(i, rows=True, plot=True) for i in db.execute("SELECT * FROM spectra WHERE source_id=?", [ID]).fetchall()]
-  else: print "No sources found."
+class get_db:
+  def __init__(self, dbpath, rows=False):
+    con = sql.connect(dbpath, isolation_level=None, detect_types=sql.PARSE_DECLTYPES)
+    con.text_factory = str
+    if rows: con.row_factory = sql.Row
+    self.modify = con
+    self.query = con.cursor()
+    
+  def add_data(self, CSV, table):
+    '''
+    Adds data in *CSV* file to the specified database *table*. Note column names (row 1 of CSV file) must match table fields to insert though order doesn't matter.
+    '''
+    data, fields, insert = u.txt2dict(CSV, all_str=True, delim=',', to_list=True), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1], []
+    columns, query = data.pop(0), "INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(fields)))
+    for row in data:
+      values = [None for i in fields]
+      for field in fields: values[fields.index(field)] = row[columns.index(field)] if field in columns and field!='id' else None
+      insert.append(tuple(values))
+    u.printer(fields,insert), self.query.executemany(query, insert), self.modify.commit()
+    print "{} records added to the {} table.".format(len(data),table.upper())
   
-def printer(labels, values, format='', to_txt=None):
-  '''
-  Prints a nice table of *values* with *labels* with auto widths. Save *to_txt* filepath, e.g. to_txt='/Users/Joe/Desktop/printout.txt' 
-  '''
-  print '\r'
-  values = [["None" if not i else "{:.10g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.10g} {}".format( float(i.magnitude if hasattr(i,'magnitude') else i), str(i.units if hasattr(i,'units') else '').split()[1]) for i in j] for j in values]
-  auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
-  lengths = format if isinstance(format,list) else auto
-  col_len = [max(auto) for i in lengths] if format=='max' else [150/len(labels) for i in lengths] if format=='fill' else lengths
-  for l,m in zip(labels,col_len):
-    print str(l).ljust(m),
-    if to_txt: txtFile.write(str(l).replace(' ','').ljust(m))
-  for v in values:
-    print '\n',
-    if to_txt: txtFile.write('\n') 
-    for k,j in zip(v,col_len):
-      print str(k).ljust(j),
-      if to_txt: txtFile.write(str(k).replace(' ','').ljust(j))
-  print '\n'
+  def clean_up(self, table):
+    '''
+    Removes exact duplicates from the specified *table* keeping the record with the lowest id.
+    '''
+    query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1][1:]))  
+    self.query.execute(query), self.modify.commit()
+  
+  def inventory(self, ID='', plot=True):
+    '''
+    Prints a summary of all objects in the database at *dbpath*. If *ID* prints only that object's summary and plots if *plot*
+    '''
+    if ID: D = self.query.execute("SELECT id, unum, shortname, ra, dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR'), names FROM sources WHERE id=?", [ID]).fetchall()
+    else: D = self.query.execute("SELECT id, unum, shortname, ra, dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR'), names FROM sources").fetchall()
+    if D:
+      u.printer(['id','unum','shortname','ra','dec','Spec Count','Phot Count','Parallax','SpT (opt)','SpT (IR)', 'Names'], D)
+      if ID and plot:
+        for i in self.query.execute("SELECT * FROM spectra WHERE source_id=?", [ID]).fetchall(): plt.figure(), plt.loglog(i[2], i[4], c='b'), plt.fill_between(i[2], i[4]-i[6], i[4]+i[6], color='k', alpha=0.2), plt.xlim(0.4,3.0), plt.grid(True), plt.yscale('log',nonposy='clip'), plt.figtext(0.15,0.88,'{}\n{}\n{}\n{}'.format(i[14],i[12],i[11],i[10]),verticalalignment='top')
+    else: print "No sources found."
+  
+def adapt_array(arr):
+  out = io.BytesIO()
+  np.save(out, arr)
+  out.seek(0)
+  # http://stackoverflow.com/a/3425465/190597 (R. Hill)
+  return buffer(out.read())
+
+def convert_array(text):
+  out = io.BytesIO(text)
+  out.seek(0)
+  return np.load(out)
+
+# Converts np.array to TEXT when inserting
+sql.register_adapter(np.ndarray, adapt_array)
+# Converts TEXT to np.array when selecting
+sql.register_converter("array", convert_array)

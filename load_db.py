@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # BDNYC database
-import xlrd, cPickle, sqlite3 as sql, pyfits as pf, numpy as np, matplotlib.pyplot as plt
-from SEDplots import SEDalt as SED
+import io, xlrd, cPickle, sqlite3 as sql, pyfits as pf, numpy as np, matplotlib.pyplot as plt
+# from SEDplots import SEDalt as SED
 from astrotools import utilities as u, astrotools as a
 path, dbpath = '/Users/Joe/Documents/Python/', '/Users/Joe/Dropbox/BDNYCdb/BDNYC.db'
 
@@ -104,21 +104,18 @@ def load_spectra():
   Get spectra from the 1624 FITS files
   '''
   (con, cur), FITS, spectra = get_db(dbpath, modify=True), fitsFiles(), []
-  cur.execute("DROP TABLE IF EXISTS spectra"), cur.execute("CREATE TABLE spectra (id INTEGER PRIMARY KEY, source_id INTEGER, wavelength BLOB, wavelength_units TEXT, flux BLOB, flux_units TEXT, unc BLOB, snr BLOB, wavelength_order INTEGER, publication_id INTEGER, obs_date TEXT, instrument TEXT, telescope TEXT, airmass REAL, filename TEXT, comment TEXT)")
+  cur.execute("DROP TABLE IF EXISTS spectra"), cur.execute("CREATE TABLE spectra (id INTEGER PRIMARY KEY, source_id INTEGER, wavelength ARRAY, wavelength_units TEXT, flux ARRAY, flux_units TEXT, unc ARRAY, snr ARRAY, wavelength_order INTEGER, publication_id INTEGER, obs_date TEXT, instrument TEXT, telescope TEXT, airmass REAL, filename TEXT, comment TEXT)")
 
   for filename in FITS.keys():
     f = FITS[filename]
     try: source_id = unum2id(FITS[filename]['unum'])
     except KeyError: source_id = None
-    try: 
-      wav, flx, err = u.unc(a.read_spec(f['path'], errors=True, atomicron=True, negtonan=True, verbose=False)[0])
-      snr = flx/err if any(flx) and any(err) else None
-      wav, flx, err = [" ".join(map(str,i)) for i in [wav,flx,err]]
-      if any(snr): snr = " ".join(map(str,snr))
-      else: snr = None
+    try: wav, flx, err = u.unc(a.read_spec(f['path'], errors=True, atomicron=True, negtonan=True, verbose=False)[0])
     except (TypeError,IndexError):
       print filename
-      wav, flx, err, snr = None, None, None, None
+      wav, flx, err = None, None, None
+    try: snr = flx/err if any(flx) and any(err) else None
+    except (TypeError,IndexError): snr = None
     spectra.append((None, source_id, wav, f['xunits'], flx, f['yunits'], err, snr, None, None, f['date'], f['instr'], f['scope'], f['airmass'], filename, f['name']))
 
   cur.executemany("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", spectra), con.commit(), con.close()
@@ -176,14 +173,31 @@ def load_synthetic_spectra():
   (con, cur), files, bt_settl = get_db('/Users/Joe/Documents/Python/Models/model_atmospheres.db', modify=True), glob.glob('/Users/Joe/Documents/Python/Models/BT-Settl_M-0.0_a+0.0/*.spec.7'), []
   for f in files:
     obj = s.read_btsettl(f, Flam=False, radius=1, dist=10)
-    bt_settl.append((None, obj['Teff'], obj['logg'], " ".join(map(str,obj['W'].magnitude)), " ".join(map(str,obj['F'].magnitude)), " ".join(map(str,obj['B'].magnitude))))
+    bt_settl.append((None, obj['Teff'], obj['logg'], obj['W'].magnitude, obj['F'].magnitude, obj['B'].magnitude))
     print "{} {}".format(obj['Teff'], obj['logg'])
-  cur.execute("DROP TABLE IF EXISTS bt_settl"), cur.execute("CREATE TABLE bt_settl (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength TEXT, flux TEXT, blackbody TEXT)")    
+  cur.execute("DROP TABLE IF EXISTS bt_settl"), cur.execute("CREATE TABLE bt_settl (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength ARRAY, flux ARRAY, blackbody ARRAY)")    
   cur.executemany("INSERT INTO bt_settl VALUES (?, ?, ?, ?, ?, ?)", bt_settl), con.commit(), con.close()
 
 # ==============================================================================================================================================
 # ================================= BDdb.py functions ==========================================================================================
 # ==============================================================================================================================================
+
+def adapt_array(arr):
+  out = io.BytesIO()
+  np.save(out, arr)
+  out.seek(0)
+  # http://stackoverflow.com/a/3425465/190597 (R. Hill)
+  return buffer(out.read())
+
+def convert_array(text):
+  out = io.BytesIO(text)
+  out.seek(0)
+  return np.load(out)
+
+# Converts np.array to TEXT when inserting
+sql.register_adapter(np.ndarray, adapt_array)
+# Converts TEXT to np.array when selecting
+sql.register_converter("ARRAY", convert_array)
 
 def fitsFiles(pickle=False, directories=['Spectra/nir_spectra/','Spectra/optical_spectra/','Spectra/IRTF_Library/']):
   if pickle:  
@@ -263,7 +277,7 @@ def fitsFiles(pickle=False, directories=['Spectra/nir_spectra/','Spectra/optical
     return cPickle.load(open(path+'Pickles/fitsFiles.p','rb'))
 
 def get_db(path, rows=False, modify=False):
-  con = sql.connect(path, isolation_level=None)
+  con = sql.connect(path, isolation_level=None, detect_types=sql.PARSE_DECLTYPES)
   con.text_factory = str
   if rows: con.row_factory = sql.Row
   return [con, con.cursor()] if modify else con.cursor()
