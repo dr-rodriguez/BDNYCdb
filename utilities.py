@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Utilities
-import warnings, re, cPickle, quantities as q, numpy as np, matplotlib.pyplot as plt, astropy as ap
+import warnings, re, cPickle, quantities as q, numpy as np, matplotlib.pyplot as plt
 from random import random
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
@@ -69,10 +69,9 @@ def find(filename, tree):
 
   return result
 
-def sxg2deg(ra='', dec=''):
-  if ra: RA = float(ap.coordinates.angles.Angle(ra, unit='hour').format(decimal=True, precision=8))
-  if dec: DEC = float(ap.coordinates.angles.Angle(dec, unit='degree').format(decimal=True, precision=8))
-  return (RA, DEC) if ra and dec else RA or DEC
+def goodness(spectrum, model, radius=1, dist=1):
+  (w, f, sig), (W, F) = spectrum, model
+  return sum((f-(F*((radius/dist)**2)))/sig)
 
 def idx_include(x, include):
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
@@ -326,6 +325,13 @@ def squaredError(a, b, c):
   c = np.array([1 if np.isnan(e) else e for e in c])
   return sum(a/c)
 
+def sxg2deg(ra='', dec=''):
+  from astropy import coordinates as apc
+  RA, DEC = '', ''
+  if ra: RA = float(apc.angles.Angle(ra, unit='hour').format(decimal=True, precision=8))
+  if dec: DEC = float(apc.angles.Angle(dec, unit='degree').format(decimal=True, precision=8))
+  return (RA, DEC) if ra and dec else RA or DEC
+
 def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False, obj_col=0, key_row=0, start=1):
   '''
   For given *txtfile* returns a parent dictionary with keys from *obj_col* and child dictionaries with keys from *key_row*, delimited by *delim* character.
@@ -361,8 +367,8 @@ def unc(spectrum, SNR=100):
   Generates E at signal to noise *SNR* for [W,F] and replaces NaNs with the same for [W,F,E]. 
   '''
   S = scrub(spectrum)
-  if len(S)==3: S[2] = np.array([(i/SNR) if np.isnan(j) else j for i,j in zip(*S[1:])])
-  elif len(S)==2: S.append(np.array([(i/SNR) for i in S[1]]))
+  if len(S)==3: S[2] = np.array([(i/SNR) if np.isnan(j) else j for i,j in zip(*S[1:])], dtype='float32')
+  elif len(S)==2: S.append(np.array([(i/SNR) for i in S[1]], dtype='float32'))
   return S
 
 def xl2dict(filepath, sheet=1):

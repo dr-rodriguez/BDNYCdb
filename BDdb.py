@@ -1,14 +1,15 @@
 #!/usr/bin/python
 # BDNYC database
-import io, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, pyfits as pf, utilities as u
+import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, pyfits as pf, utilities as u, astrotools.astrotools as a
 
 class get_db:
-  def __init__(self, dbpath, rows=False):
+  def __init__(self, dbpath):
     con = sql.connect(dbpath, isolation_level=None, detect_types=sql.PARSE_DECLTYPES)
     con.text_factory = str
-    if rows: con.row_factory = sql.Row
     self.modify = con
     self.query = con.cursor()
+    self.dict = con.cursor()
+    self.dict.row_factory = sql.Row
     
   def add_data(self, CSV, table):
     '''
@@ -22,6 +23,106 @@ class get_db:
       insert.append(tuple(values))
     u.printer(fields,insert), self.query.executemany(query, insert), self.modify.commit()
     print "{} records added to the {} table.".format(len(data),table.upper())
+    
+  def add_ascii(self, asciiPath, snrPath=''):
+    filename = os.path.basename(asciiPath)
+    (name, wav_order, date), data = filename.replace('_',' ').replace('.',' ').split()[:3], zip(*u.txt2dict(asciiPath, to_list=True))
+    wav, flx = [np.array(i, dtype='float32') for i in data]
+    try:
+      snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[1][1:], dtype='float32')
+      err = flx/snr
+    except: snr = err = ''
+    xunits, yunits = 'um', 'normalized'
+    regime = pub_id = instr = scope = airmass = header = source_id = ''
+    
+    q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '{0}'".format(name)
+    result = self.query.execute(q).fetchall()
+    if result:
+      if len(result)>1: print result
+      else: source_id, unum = result[0]
+    
+    try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
+    except: print "Couldn't add file {} to database.".format(filename)
+
+  def add_fits(self, fitsPath, verbose=False):
+    '''
+    Checks the header of the *fitsFile* and inserts it into the database, with source_id if possible.
+    '''
+    filename, header, lookup, unum = os.path.basename(fitsPath), pf.getheader(fitsPath), u.txt2dict('/Users/Joe/Documents/Python/Spectra/unum_lookup.txt'), None
+    
+    # RA and DEC (This is rejecting too many files! Why same RA and DEC for different files, e.g. see Terminal?)
+    try: RA, DEC = header['RA'], header['DEC']
+    except KeyError: RA, DEC = '', ''
+    try:
+      ra = RA if isinstance(RA,float) else float(RA) if RA.replace('+','').replace('-','').replace('.','').isdigit() else u.sxg2deg(ra=RA)
+      dec = DEC if isinstance(DEC,float) else float(DEC) if DEC.replace('+','').replace('-','').replace('.','').isdigit() else u.sxg2deg(dec=DEC)
+      # print "{} {} => {} {}".format(RA,DEC,ra,dec)
+    except ValueError:
+      print "{}: {} {}".format(filename,RA,DEC)
+      ra, dec = '', ''
+
+    # x- and y-units
+    try:
+      xunits = header['XUNITS'] 
+      if 'microns' in xunits or 'Microns' in xunits or 'um' in xunits: xunits = 'um'
+    except KeyError:
+      try:
+         if header['BUNIT']: xunits = 'um'
+      except KeyError: xunits = ''
+    try: yunits = header['YUNITS'].replace(' ','')
+    except KeyError:
+      try: yunits = header['BUNIT'].replace(' ','')
+      except KeyError: yunits = ''
+    if 'erg' in yunits and 'A' in yunits: yunits = 'ergs-1cm-2A-1'
+    elif 'erg' in yunits and 'um' in yunits: yunits = 'ergs-1cm-2um-1'
+    elif 'W' in yunits and 'um' in yunits: yunits = 'Wm-2um-1'
+    elif 'W' in yunits and 'A' in yunits: yunits = 'Wm-2A-1'
+
+    # Date, object name, telescope and instrument
+    try: date = header['DATE_OBS']
+    except KeyError:
+      try: date = header['DATE-OBS']
+      except KeyError: date = ''
+    try: obj = header['OBJECT']
+    except KeyError: obj = ''
+    try:
+      n = header['TELESCOP'].lower()
+      scope = 5 if 'hst' in n else 6 if 'spitzer' in n else 7 if 'irtf' in n else 9 if 'keck' in n and 'ii' in n else 8 if 'keck' in n and 'i' in n else 10 if 'kp' in n and '4' in n else 11 if 'kp' in n and '2' in n else 12 if 'bok' in n else 13 if 'mmt' in n else 14 if 'ctio' in n and '1' in n else 15 if 'ctio' in n and '4' in n else 16 if 'gemini' in n and 'north' in n else 17 if 'gemini' in n and 'south' in n else 18 if 'vlt' in n else 19 if '3.5m' in n else 20 if 'subaru' in n else 0
+    except KeyError: scope = ''
+    try: 
+      i = header['INSTRUME'].lower()
+      instr = 1 if 'r-c spec' in i or 'test' in i or 'nod' in i else 2 if 'gmos-n' in i else 3 if 'gmos-s' in i else 4 if 'fors' in i else 5 if 'lris' in i else 6 if 'spex' in i else 7 if 'ldss3' in i else 8 if 'focas' in i else 0
+    except KeyError: instr = ''
+    try: airmass = header['AIRMASS']
+    except: airmass = 0
+    try: name = old_db[unum]['name']
+    except: name = ''
+    pub_id, wav_order = '', ''
+    
+    unum = has_unum(filename) or has_unum(name) or has_unum(obj)
+    for U in lookup:
+      if filename == lookup[U]['filename']: unum = U
+    
+    if unum:
+      try: source_id = {str(k):j for j,k in [tuple(i) for i in self.query.execute("SELECT id,unum FROM sources")]}[unum]
+      except KeyError: source_id = None
+    else: source_id = None
+    
+    q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '{0}'".format(filename.replace('.fits',''))
+    result = self.query.execute(q).fetchall()
+    if result:
+      if len(result)>1: print result
+      else: source_id, unum = result[0]
+    
+    # try:
+    wav, flx, err = u.unc(a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0])
+    regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
+    try: snr = flx/err if any(flx) and any(err) else None
+    except (TypeError,IndexError): snr = None
+    self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
+    if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
+    # except: 
+      # print [filename, source_id, xunits, yunits, date, instr, scope, airmass, name]
   
   def clean_up(self, table):
     '''
@@ -30,7 +131,7 @@ class get_db:
     query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1][1:]))  
     self.query.execute(query), self.modify.commit()
   
-  def inventory(self, ID='', with_pi=True, plot=True):
+  def inventory(self, ID='', with_pi=False, plot=True):
     '''
     Prints a summary of all objects in the database at *dbpath*. If *ID* prints only that object's summary and plots if *plot*
     '''
@@ -45,7 +146,7 @@ class get_db:
     else: print "No sources found."
 
 # ==============================================================================================================================================
-# ================================= Adapters and converters for special data types ====================================================
+# ================================= Adapters and converters for special data types =============================================================
 # ==============================================================================================================================================
   
 def adapt_array(arr):
@@ -68,3 +169,16 @@ def convert_header(text):
 
 sql.register_adapter(np.ndarray, adapt_array), sql.register_adapter(pf.header.Header, adapt_header)
 sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER", convert_header)
+
+# ==============================================================================================================================================
+# ================================= Little helper functions ====================================================================================
+# ==============================================================================================================================================
+
+def has_unum(text):
+  if 'U' in text.upper():
+    idx = text.upper().index('U')
+    num = text[idx+1:idx+6]
+    return text[idx:idx+6].upper() if num.isdigit() and len(num)==5 else None
+  else: return None    
+
+def shortname(desig): return desig[desig.index('J')+1:desig.index('J')+5] + desig[desig.index('-' if '-' in desig else '+'):desig.index('-' if '-' in desig else '+')+5]
