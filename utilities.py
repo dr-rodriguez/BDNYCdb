@@ -1,15 +1,15 @@
 #!/usr/bin/python
 # Utilities
-import warnings, re, cPickle, quantities as q, numpy as np, matplotlib.pyplot as plt
+import warnings, re, cPickle, astropy.units as q, numpy as np, matplotlib.pyplot as plt
 from random import random
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
-def app2abs(mag, dist, app=True): return (mag-(1 if app else -1)*5*np.log10(dist/(10*q.pc))).magnitude.item()                                                      
+def app2abs(mag, dist, app=True): return (mag-(1 if app else -1)*5*np.log10(dist/(10*q.pc))).value.item()                                                      
 
 def ChiSquare(a, b, unc=None, array=False, Gtest=False):
-  a, b = [np.array(map(float,i.magnitude)) if hasattr(i,'units') else np.array(map(float,i)) for i in [a,b]]
-  c, variance = np.array(map(float,unc.magnitude)) if hasattr(unc, 'units') else np.array(map(float,np.ones(len(a)))), np.std(b)**4 # Since the standard deviation is the root of the variance
+  a, b = [np.array(map(float,i.value)) if hasattr(i,'_unit') else np.array(map(float,i)) for i in [a,b]]
+  c, variance = np.array(map(float,unc.value)) if hasattr(unc, '_unit') else np.array(map(float,np.ones(len(a)))), np.std(b)**4 # Since the standard deviation is the root of the variance
   X2 = np.array([(j*np.log(j/i)/k)**2/i for i,j,k in zip(a,b,c)]) if Gtest else np.array([((i-j)/k)**2/variance for i,j,k in zip(a,b,c)])    
   return X2 if array else sum(X2)
   
@@ -88,9 +88,9 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   mag = -2.5*log10(F/zp)  =>  flux = zp*10**(-mag/2.5)
   '''
   filt = a.filter_info(band) 
-  zp = filt['zp_photon' if photon else 'zp']*(1 if photon else q.erg)/q.s/q.cm**2/q.angstrom
-  F = (zp*(filt['eff']*q.um if Flam else 1)*10**(-mag/2.5)).rescale((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.angstrom))
-  E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).rescale((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.angstrom)) if unc else 1
+  zp = filt['zp_photon' if photon else 'zp']*(1 if photon else q.erg)/q.s/q.cm**2/q.Angstrom
+  F = (zp*(filt['eff']*q.um if Flam else 1)*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.Angstrom))
+  E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.Angstrom)) if unc else 1
   return [F,E] if unc else F
 
 def modelFit(spectrum, exclude=[], Flam=True, SNR=50, D_Flam=None):
@@ -111,7 +111,7 @@ def modelFit(spectrum, exclude=[], Flam=True, SNR=50, D_Flam=None):
       spec_list.append((ChiSquare(modelMags*norm, specMags), p, norm))
 
   else:    
-    spec = [i.magnitude if hasattr(i,'units') else i for i in unc(spectrum, SNR=SNR)]
+    spec = [i.value if hasattr(i,'_unit') else i for i in unc(spectrum, SNR=SNR)]
     wave, flux, error = [i[idx_exclude(spec[0],exclude)] for i in spec] if exclude else spec
 
     for k in S.keys():
@@ -122,7 +122,7 @@ def modelFit(spectrum, exclude=[], Flam=True, SNR=50, D_Flam=None):
   from heapq import nsmallest
   X2, params, norm = min(spec_list)
   printer(['Chi-square','Parameters'], nsmallest(5,spec_list))
-  return [S[params]['W'], (S[params]['F']*norm*(S[params]['W'] if Flam else 1)).rescale(q.erg/q.s/q.cm**2/(1 if Flam else q.angstrom)), params]
+  return [S[params]['W'], (S[params]['F']*norm*(S[params]['W'] if Flam else 1)).to(q.erg/q.s/q.cm**2/(1 if Flam else q.Angstrom)), params]
 
 def norm_spec(spectrum, template, exclude=[]):
   '''
@@ -132,7 +132,7 @@ def norm_spec(spectrum, template, exclude=[]):
   S, T = scrub(spectrum), scrub(template)
   S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
   if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
-  norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2])*(S[1].units if hasattr(S[1],'units') else 1), x=T0[0])                 
+  norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2])*(S[1].unit if hasattr(S[1],'_unit') else 1), x=T0[0])                 
   S[1] = S[1]*norm                                                                              
   try: S[2] = S[2]*norm                                                        
   except IndexError: pass
@@ -152,8 +152,8 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
     for n,x1,x2 in trim: all_spec[n] = [i[idx_exclude(all_spec[n][0],[(x1,x2)])] for i in all_spec[n]]
     template, spectra = all_spec[0], all_spec[1:]
   
-  (W, F, E), normalized = [i.magnitude if hasattr(i,'units') else i for i in unc(template, SNR=SNR)], []
-  for S in spectra: normalized.append(norm_spec([i.magnitude if hasattr(i,'units') else i for i in unc(S, SNR=SNR)], [W,F,E], exclude=exclude+modelReplace))
+  (W, F, E), normalized = [i.value if hasattr(i,'_unit') else i for i in unc(template, SNR=SNR)], []
+  for S in spectra: normalized.append(norm_spec([i.value if hasattr(i,'_unit') else i for i in unc(S, SNR=SNR)], [W,F,E], exclude=exclude+modelReplace))
   if plot: plt.loglog(W, F, alpha=0.5), plt.fill_between(W, F-E, F+E, alpha=0.1)
     
   if composite:
@@ -194,7 +194,7 @@ def printer(labels, values, format='', to_txt=None):
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
   '''
   print '\r'
-  values = [["None" if not i else "{:.10g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.10g} {}".format( float(i.magnitude if hasattr(i,'magnitude') else i), str(i.units if hasattr(i,'units') else '').split()[1]) for i in j] for j in values]
+  values = [["None" if not i else "{:.10g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.10g} {}".format( float(i.value if hasattr(i,'_value') else i), str(i.unit.to_string() if hasattr(i,'_unit') else '').split()[1]) for i in j] for j in values]
   auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
   lengths = format if isinstance(format,list) else auto
   col_len = [max(auto) for i in lengths] if format=='max' else [150/len(labels) for i in lengths] if format=='fill' else lengths
@@ -292,12 +292,11 @@ def str2Q(x,target=''):
   '''
   if x:       
     def Q(IN):
-      import quantities as q
       OUT = 1
       text = ['erg', '/s', 's-1', 's', '/um', 'um-1', 'um', '/cm2', 'cm-2', 'cm2', '/cm', 'cm-1', 'cm', \
               '/A', 'A-1', 'A', 'W', '/m2', 'm-2', 'm2', '/m', 'm-1', 'm', '/Hz', 'Hz-1']
       vals = [q.erg, q.s**-1, q.s**-1, q.s, q.um**-1, q.um**-1, q.um, q.cm**-2, q.cm**-2, q.cm**2, q.cm**-1, q.cm**-1, q.cm, 
-              q.angstrom**-1, q.angstrom**-1, q.angstrom, q.W, q.m**-2, q.m**-2, q.m**2, q.m**-1, q.m**-1, q.m, q.Hz**-1, q.Hz**-1]
+              q.Angstrom**-1, q.Angstrom**-1, q.Angstrom, q.W, q.m**-2, q.m**-2, q.m**2, q.m**-1, q.m**-1, q.m, q.Hz**-1, q.Hz**-1]
       for t,v in zip(text,vals):
         if t in IN:
           OUT = OUT*v
@@ -308,7 +307,7 @@ def str2Q(x,target=''):
     if target:
       q = str(Q(target)).split()[-1]
       try:
-        unit = unit.rescale(q)
+        unit = unit.to(q)
       except ValueError:
         print "{} could not be rescaled to {}".format(unit,q)
 

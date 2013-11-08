@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, glob, xlrd, cPickle, BDdb, sqlite3 as sql, pyfits as pf, numpy as np, matplotlib.pyplot as plt, utilities as u
+import io, os, glob, xlrd, cPickle, BDdb, sqlite3 as sql, astropy.io.fits as pf, numpy as np, matplotlib.pyplot as plt, utilities as u
 from astrotools import astrotools as a
 path = '/Users/Joe/Documents/Python/'
 db = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/BDNYC.db')
@@ -128,7 +128,11 @@ def load_spectra(directories=['Spectra/nir_spectra/','Spectra/optical_spectra/',
     # try: db.add_fits(f)
     # except: print "Couldn't add file {}".format(f)
   
-  # for f in [item for sublist in [glob.glob('/Users/Joe/Documents/Python/Spectra/ascii_files/') for folder in directories] for item in sublist]
+  # P = '/Users/Joe/Documents/Python/Spectra/ascii_files/'
+  # for F in [i for i in os.walk(P)][0][1]:
+  #   ascii, snr = glob.glob(P+F+'/*ascii_hc'), glob.glob(P+F+'/snr.dat')
+  #	  db.add_ascii(ascii, snr)
+  
 
 def load_systems():
   db.query.execute("DROP TABLE IF EXISTS systems"), db.query.execute("CREATE TABLE systems (id INTEGER PRIMARY KEY, name TEXT)")
