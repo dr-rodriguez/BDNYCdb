@@ -124,9 +124,8 @@ def load_spectra(directories=['Spectra/nir_spectra/','Spectra/optical_spectra/',
 
   # Add FITS files to database
   for f in [item for sublist in [glob.glob(path+folder+'*.fits') for folder in directories] for item in sublist]:
-    db.add_fits(f)
-    # try: db.add_fits(f)
-    # except: print "Couldn't add file {}".format(f)
+    try: db.add_fits(f)
+    except: print "Couldn't add file {}".format(f)
   
   # for f in [item for sublist in [glob.glob('/Users/Joe/Documents/Python/Spectra/ascii_files/') for folder in directories] for item in sublist]
 

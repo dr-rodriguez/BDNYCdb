@@ -114,15 +114,15 @@ class get_db:
       if len(result)>1: print result
       else: source_id, unum = result[0]
     
-    # try:
-    wav, flx, err = u.unc(a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0])
-    regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
-    try: snr = flx/err if any(flx) and any(err) else None
-    except (TypeError,IndexError): snr = None
-    self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
-    if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
-    # except: 
-      # print [filename, source_id, xunits, yunits, date, instr, scope, airmass, name]
+    try:
+      wav, flx, err = u.unc(a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0])
+      regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
+      try: snr = flx/err if any(flx) and any(err) else None
+      except (TypeError,IndexError): snr = None
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
+      if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
+    except: 
+      print [filename, source_id, xunits, yunits, date, instr, scope, airmass, name]
   
   def clean_up(self, table):
     '''
