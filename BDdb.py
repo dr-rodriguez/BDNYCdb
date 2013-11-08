@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, pyfits as pf, utilities as u, astrotools.astrotools as a
+import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools.astrotools as a
 
 class get_db:
   def __init__(self, dbpath):
@@ -32,8 +32,8 @@ class get_db:
       snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[1][1:], dtype='float32')
       err = flx/snr
     except: snr = err = ''
-    xunits, yunits = 'um', 'normalized'
-    regime = pub_id = instr = scope = airmass = header = source_id = ''
+    xunits, yunits, instr, scope = 'um', 'normalized', 9, 9
+    regime = pub_id = airmass = header = source_id = ''
     
     q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '{0}'".format(name)
     result = self.query.execute(q).fetchall()
@@ -91,7 +91,7 @@ class get_db:
     except KeyError: scope = ''
     try: 
       i = header['INSTRUME'].lower()
-      instr = 1 if 'r-c spec' in i or 'test' in i or 'nod' in i else 2 if 'gmos-n' in i else 3 if 'gmos-s' in i else 4 if 'fors' in i else 5 if 'lris' in i else 6 if 'spex' in i else 7 if 'ldss3' in i else 8 if 'focas' in i else 0
+      instr = 1 if 'r-c spec' in i or 'test' in i or 'nod' in i else 2 if 'gmos-n' in i else 3 if 'gmos-s' in i else 4 if 'fors' in i else 5 if 'lris' in i else 6 if 'spex' in i else 7 if 'ldss3' in i else 8 if 'focas' in i else 9 if 'nirspec' in i else 0
     except KeyError: instr = ''
     try: airmass = header['AIRMASS']
     except: airmass = 0
@@ -105,7 +105,12 @@ class get_db:
     
     if unum:
       try: source_id = {str(k):j for j,k in [tuple(i) for i in self.query.execute("SELECT id,unum FROM sources")]}[unum]
-      except KeyError: source_id = None
+      except KeyError: 
+        try:
+          self.query.execute("INSERT INTO sources VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, ra, dec, None, None, None, unum, None, None)), self.modify.commit()
+          q = "SELECT * FROM sources WHERE unum='{}'".format(unum)
+          source_id = self.dict.execute(q).fetchone()['id']
+        except: source_id = None
     else: source_id = None
     
     q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '{0}'".format(filename.replace('.fits',''))

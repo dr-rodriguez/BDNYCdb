@@ -127,7 +127,14 @@ def load_spectra(directories=['Spectra/nir_spectra/','Spectra/optical_spectra/',
     try: db.add_fits(f)
     except: print "Couldn't add file {}".format(f)
   
-  # for f in [item for sublist in [glob.glob('/Users/Joe/Documents/Python/Spectra/ascii_files/') for folder in directories] for item in sublist]
+  # Add ascii files to database
+  for f in [[''.join([root,d]) for d in dirs] for root,dirs,files in os.walk('/Users/Joe/Documents/Python/Spectra/ascii_files/')][0]:
+    try:
+      ascii = glob.glob(f+'/*ascii_hc').pop()
+      try: snr = glob.glob(f+'/snr.dat').pop()
+      except: snr = ''
+      db.add_ascii(ascii, snrPath=snr)
+    except: print "Couldn't add files from {}".format(f) 
 
 def load_systems():
   db.query.execute("DROP TABLE IF EXISTS systems"), db.query.execute("CREATE TABLE systems (id INTEGER PRIMARY KEY, name TEXT)")
