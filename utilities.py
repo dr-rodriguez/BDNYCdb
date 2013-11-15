@@ -139,7 +139,7 @@ def norm_spec(spectrum, template, exclude=[]):
   S, T = scrub(spectrum), scrub(template)
   S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
   if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
-  norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2])*(S[1].units if hasattr(S[1],'units') else 1), x=T0[0])                 
+  norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2])*(S[1].unit if hasattr(S[1],'_unit') else 1), x=T0[0])                 
   S[1] = S[1]*norm                                                                              
   try: S[2] = S[2]*norm                                                        
   except IndexError: pass
@@ -296,7 +296,6 @@ def str2Q(x,target=''):
   '''
   if x:       
     def Q(IN):
-      import quantities as q
       OUT = 1
       text = ['erg', '/s', 's-1', 's', '/um', 'um-1', 'um', '/cm2', 'cm-2', 'cm2', '/cm', 'cm-1', 'cm', \
               '/A', 'A-1', 'A', 'W', '/m2', 'm-2', 'm2', '/m', 'm-1', 'm', '/Hz', 'Hz-1']
