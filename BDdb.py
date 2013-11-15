@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools.astrotools as a
+import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools as a
 path = '/Users/Joe/Documents/Python/'
 
 class get_db:
