@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools as a
+import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools.astrotools as a
+path = '/Users/Joe/Documents/Python/'
 
 class get_db:
   def __init__(self, dbpath):
@@ -10,10 +11,10 @@ class get_db:
     self.query = con.cursor()
     self.dict = con.cursor()
     self.dict.row_factory = sql.Row
-    
+        
   def add_data(self, CSV, table):
     '''
-    Adds data in *CSV* file to the specified database *table*. Note column names (row 1 of CSV file) must match table fields to insert though order doesn't matter.
+    Adds data in *CSV* file to the specified database *table*. Note column names (row 1 of CSV file) must match table fields to insert though order and completeness don't matter.
     '''
     data, fields, insert = u.txt2dict(CSV, all_str=True, delim=',', to_list=True), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1], []
     columns, query = data.pop(0), "INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(fields)))
@@ -25,30 +26,45 @@ class get_db:
     print "{} records added to the {} table.".format(len(data),table.upper())
     
   def add_ascii(self, asciiPath, snrPath=''):
-    filename = os.path.basename(asciiPath)
-    (name, wav_order, date), data = filename.replace('_',' ').replace('.',' ').split()[:3], zip(*u.txt2dict(asciiPath, to_list=True))
-    wav, flx = [np.array(i, dtype='float32') for i in data]
+    '''
+    Given the path to an ascii data file *asciiPath* with filename format NAME_ORDER.DATE inserts spectrum into the database. If *snrPath* is provided, generates uncertainty and inserts both arrays.
+    '''
+    filename, data, lookup = os.path.basename(asciiPath), zip(*u.txt2dict(asciiPath, to_list=True, skip=['#'])), u.txt2dict(path+'Spectra/unum_lookup.txt', to_list=True)
+    try: (name, wav_order, date) = filename.replace('.dat','').replace('_',' ').replace('.',' ').split()[:3]
+    except ValueError: name, wav_order, date = filename.replace('_',' ').replace('.',' ').split()[0], '', ''
+    wav, flx = [np.array(i, dtype='float32') for i in data][:2]
     try:
       snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[1][1:], dtype='float32')
       err = flx/snr
     except: snr = err = ''
-    xunits, yunits = 'um', 'normalized'
-    regime = pub_id = instr = scope = airmass = header = source_id = ''
+    xunits, yunits, instr, scope, h = 'um', 'normalized', 9, 9, u.txt2dict(asciiPath, to_list=True)
+    pub_id = airmass = ''
+    hdu, regime = pf.PrimaryHDU(), 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None
+    hdu.header.append(('COMMENT',' '.join([' '.join(i) for n,i in enumerate(h) if h[n][0].startswith('#')]),''))
     
-    q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '{0}'".format(name)
-    result = self.query.execute(q).fetchall()
-    if result:
-      if len(result)>1: print result
-      else: source_id, unum = result[0]
+    unum = has_unum(filename) or has_unum(name)
+    for U,fn in lookup:
+      if filename == fn: unum = U
     
-    try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
+    if unum:
+      try: source_id = {str(k):j for j,k in [tuple(i) for i in self.query.execute("SELECT id, unum FROM sources")]}[unum]
+      except KeyError: pass
+    else:
+      q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '%{0}%' OR designation LIKE '%{0}%'".format(filename.replace('_ascii_hc','').replace('.dat',''))
+      result = self.query.execute(q).fetchall()
+      if result:
+        if len(result)>1: print name, shortname, unum, result
+        else: source_id, unum = result[0]
+      else: source_id = unum = ''
+    
+    try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, hdu.header)), self.modify.commit()
     except: print "Couldn't add file {} to database.".format(filename)
 
   def add_fits(self, fitsPath, verbose=False):
     '''
     Checks the header of the *fitsFile* and inserts it into the database, with source_id if possible.
     '''
-    filename, header, lookup, unum = os.path.basename(fitsPath), pf.getheader(fitsPath), u.txt2dict('/Users/Joe/Documents/Python/Spectra/unum_lookup.txt'), None
+    filename, header, lookup, unum = os.path.basename(fitsPath), pf.getheader(fitsPath), u.txt2dict(path+'Spectra/unum_lookup.txt', to_list=True), None
     
     # RA and DEC (This is rejecting too many files! Why same RA and DEC for different files, e.g. see Terminal?)
     try: RA, DEC = header['RA'], header['DEC']
@@ -56,7 +72,6 @@ class get_db:
     try:
       ra = RA if isinstance(RA,float) else float(RA) if RA.replace('+','').replace('-','').replace('.','').isdigit() else u.sxg2deg(ra=RA)
       dec = DEC if isinstance(DEC,float) else float(DEC) if DEC.replace('+','').replace('-','').replace('.','').isdigit() else u.sxg2deg(dec=DEC)
-      # print "{} {} => {} {}".format(RA,DEC,ra,dec)
     except ValueError:
       print "{}: {} {}".format(filename,RA,DEC)
       ra, dec = '', ''
@@ -91,7 +106,7 @@ class get_db:
     except KeyError: scope = ''
     try: 
       i = header['INSTRUME'].lower()
-      instr = 1 if 'r-c spec' in i or 'test' in i or 'nod' in i else 2 if 'gmos-n' in i else 3 if 'gmos-s' in i else 4 if 'fors' in i else 5 if 'lris' in i else 6 if 'spex' in i else 7 if 'ldss3' in i else 8 if 'focas' in i else 0
+      instr = 1 if 'r-c spec' in i or 'test' in i or 'nod' in i else 2 if 'gmos-n' in i else 3 if 'gmos-s' in i else 4 if 'fors' in i else 5 if 'lris' in i else 6 if 'spex' in i else 7 if 'ldss3' in i else 8 if 'focas' in i else 9 if 'nirspec' in i else 0
     except KeyError: instr = ''
     try: airmass = header['AIRMASS']
     except: airmass = 0
@@ -100,29 +115,35 @@ class get_db:
     pub_id, wav_order = '', ''
     
     unum = has_unum(filename) or has_unum(name) or has_unum(obj)
-    for U in lookup:
-      if filename == lookup[U]['filename']: unum = U
+    for U,fn in lookup:
+      if filename == fn: unum = U
     
     if unum:
       try: source_id = {str(k):j for j,k in [tuple(i) for i in self.query.execute("SELECT id,unum FROM sources")]}[unum]
-      except KeyError: source_id = None
-    else: source_id = None
-    
-    q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '{0}'".format(filename.replace('.fits',''))
-    result = self.query.execute(q).fetchall()
-    if result:
-      if len(result)>1: print result
-      else: source_id, unum = result[0]
-    
-    # try:
-    wav, flx, err = u.unc(a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0])
-    regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
-    try: snr = flx/err if any(flx) and any(err) else None
-    except (TypeError,IndexError): snr = None
-    self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
-    if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
-    # except: 
-      # print [filename, source_id, xunits, yunits, date, instr, scope, airmass, name]
+      except KeyError: 
+        try:
+          self.query.execute("INSERT INTO sources VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, ra, dec, None, None, None, unum, None, None)), self.modify.commit()
+          q = "SELECT * FROM sources WHERE unum='{}'".format(unum)
+          source_id = self.dict.execute(q).fetchone()['id']
+        except: source_id = None
+    else:
+      q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '%{0}%' OR designation LIKE '%{0}%'".format(filename.replace('.fits',''))
+      result = self.query.execute(q).fetchall()
+      if result:
+        if len(result)>1: print name, shortname, unum, result
+        else: source_id, unum = result[0]
+      else: source_id = unum = ''
+
+    try:
+      wav, flx, err = u.unc(a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0])
+      regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
+      try: snr = flx/err if any(flx) and any(err) else None
+      except (TypeError,IndexError): snr = None
+      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
+      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, None)), self.modify.commit()
+      if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
+    except: 
+      print [filename, source_id, xunits, yunits, date, instr, scope, airmass, name]
   
   def clean_up(self, table):
     '''
@@ -131,14 +152,15 @@ class get_db:
     query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1][1:]))  
     self.query.execute(query), self.modify.commit()
   
-  def inventory(self, ID='', with_pi=False, plot=True):
+  def inventory(self, ID='', with_pi=False, SED=False, plot=True):
     '''
     Prints a summary of all objects in the database at *dbpath*. If *ID* prints only that object's summary and plots if *plot*
     '''
-    if ID: D = self.query.execute("SELECT id, unum, ra, dec, (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources WHERE id=?", [ID]).fetchall()
-    else:
-      if with_pi: D = self.query.execute("SELECT s.id, s.unum, s.ra, s.dec, (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None'").fetchall()
-      else: D = self.query.execute("SELECT id, unum, ra, dec, (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources").fetchall()
+    q = "SELECT id, unum, ra, dec, (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources"
+    if ID: q += ' WHERE id={}'.format(ID)
+    elif with_pi and not ID: q = "SELECT s.id, s.unum, s.ra, s.dec, (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None'"
+    elif SED and not ID: q = "SELECT s.id, s.unum, s.ra, s.dec, (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='optical'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None' AND (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT')>0 AND (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR' OR spectra.regime='MIR') >0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id) >0"
+    D = self.query.execute(q).fetchall()  
     if D:
       u.printer(['id','unum','ra','dec','Optical','NIR','Phot Count','Parallax','OPT','IR'], D)
       if ID and plot:
@@ -173,6 +195,14 @@ sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER",
 # ==============================================================================================================================================
 # ================================= Little helper functions ====================================================================================
 # ==============================================================================================================================================
+
+def associate(unum, filename, lookupPath=''):  
+  if len(unum) == 6 and unum.startswith('U') and unum[1:].isdigit():
+    lookup = lookupPath or path+'Spectra/unum_lookup.txt'
+    with open(lookup, "a") as unumFile:
+      unumFile.write('\n'+unum+'\t'+filename) 
+    print "File {} linked to object {}.".format(filename,unum)
+  else: print "Could not update list with unum '{}' and filename '{}'.".format(unum,filename)
 
 def has_unum(text):
   if 'U' in text.upper():
