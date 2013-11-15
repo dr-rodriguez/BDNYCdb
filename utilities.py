@@ -1,10 +1,6 @@
 #!/usr/bin/python
 # Utilities
-<<<<<<< HEAD
-import warnings, re, cPickle, numpy as np, matplotlib.pyplot as plt, astropy as ap
-=======
 import warnings, re, cPickle, astropy.units as q, numpy as np, matplotlib.pyplot as plt
->>>>>>> 7fd44e7c8b020a7c710a3cf3fca8ee420757e6cf
 from random import random
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
