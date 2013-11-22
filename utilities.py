@@ -5,7 +5,13 @@ from random import random
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
-def app2abs(mag, dist, app=True): return (mag-(1 if app else -1)*5*np.log10(dist/(10*q.pc)))                                                    
+def app2abs(magnitude, distance): 
+  if isinstance(magnitude,tuple) and isinstance(distance,tuple):
+    (m, sig_m), (d, sig_d) = magnitude, distance
+    sig_M = np.sqrt(sig_m**2 + 25*(sig_d/d).value**2)
+    M = (m-5*np.log10(d/(10*q.pc)))
+    return (M, sig_M)
+  else: return (magnitude-5*np.log10(distance/(10*q.pc)))                                                    
 
 def ChiSquare(a, b, unc=None, array=False, Gtest=False):
   a, b = [np.array(map(float,i.value)) if hasattr(i,'_unit') else np.array(map(float,i)) for i in [a,b]]
@@ -30,11 +36,11 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits=5, order=''):
     for k in D.keys():
       w.append(k)
       for i in D[k].keys():
-        D[k][i] = '-' if not D[k][i] else round(D[k][i],digits) if isinstance(D[k][i],(float,int)) else str(D[k][i]) if isinstance(D[k][i],unicode) else D[k][i]
+        D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
         w.append(i), w.append(str(D[k][i]))
     width = len(max(w, key=len))
     head = ['{!s:{}}'.format(column1,width)]
-    headorder = order or D[D.keys()[0]].keys()
+    headorder = order or sorted(D[D.keys()[0]].keys())
     for i in headorder: head.append('{!s:{}}'.format(i,width))
     writer.writerow(head)
     for i in D.keys():
@@ -75,9 +81,11 @@ def find(filename, tree):
 
   return result
 
-def goodness(spectrum, model, radius=1, dist=1):
+def goodness(spectrum, model, radius='', dist=''):
   (w, f, sig), (W, F) = spectrum, model
-  return sum((f-(F*((radius/dist)**2)))/sig)
+  weight = np.concatenate([np.array([1]),np.diff(w)])
+  C = (radius/dist)**2 if radius and dist else (sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2))
+  return sum(weight*((f-F*C)/sig)**2) if radius and distance else [sum(weight*((f-F*C)/sig)**2), C]
 
 def idx_include(x, include):
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
@@ -100,11 +108,11 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA)) if unc else 1
   return [F,E] if unc else F
 
-def modelFit(spectrum, exclude=[], Flam=True, SNR=50, D_Flam=None):
+def modelFit(spectrum, exclude=[], Flam=False, SNR=50, D_Flam=None, plot=False):
   '''
   For given *spectrum* [W,F,E] returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  S, spec_list = D_Flam or cPickle.load(open('/Users/Joe/Documents/Python/Pickles/synSpec_Flam_3000.p',"rb")), []
+  S, spec_list = D_Flam, []
   
   if isinstance(spectrum,dict):
     from syn_phot.syn_phot import get_filters, color_table
@@ -123,23 +131,33 @@ def modelFit(spectrum, exclude=[], Flam=True, SNR=50, D_Flam=None):
 
     for k in S.keys():
       model = np.interp(wave, S[k]['W'], S[k]['F'], left=0, right=0)
-      norm = np.trapz(flux)/np.trapz(model)
-      spec_list.append((ChiSquare(model*norm, flux, unc=error), k, norm))
+      # norm = np.trapz(flux)/np.trapz(model)
+      # G = ChiSquare(model*norm, flux, unc=error)
+      G, C = goodness([wave,flux,error],[wave,model])
+      spec_list.append((abs(G), k, C))
+    
+    if plot:  
+      plt.figure()
+      from itertools import groupby
+      for key,group in [[k,list(grp)] for k,grp in groupby(sorted(spec_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
+        G, P, C = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
+        plt.plot([int(t.split()[0]) for t in P], G, '-o', color=plt.cm.spectral((float(key)-1)*2./10,1), label=key)
+      plt.legend(loc=0, ncol=2), plt.xlim(500,3000), plt.grid(True), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff')
 
   from heapq import nsmallest
-  X2, params, norm = min(spec_list)
-  printer(['Chi-square','Parameters'], nsmallest(5,spec_list))
-  return [S[params]['W'], (S[params]['F']*norm*(S[params]['W'] if Flam else 1)).to(q.erg/q.s/q.cm**2/(1 if Flam else q.AA)), params]
+  G, params, norm = min(spec_list)
+  printer(['Goodness','Parameters'], nsmallest(5,spec_list))
+  return [S[params]['W'], S[params]['F']*norm*(S[params]['W']*10000 if Flam else 1), params]
 
 def norm_spec(spectrum, template, exclude=[]):
   '''
   Returns *spectrum* with [W,F] or [W,F,E] normalized to *template* [W,F] or [W,F,E].
   Wavelength range tuples provided in *exclude* argument are ignored during normalization, i.e. exclude=[(0.65,0.72),(0.92,0.97)].
   '''                                                          
-  S, T = scrub(spectrum), scrub(template)
+  S, T = scrub([i.value if hasattr(i,'_unit') else i for i in spectrum]), scrub([i.value if hasattr(i,'_unit') else i for i in template])
   S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
   if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
-  norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2])*(S[1].unit if hasattr(S[1],'_unit') else 1), x=T0[0])                 
+  norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2]), x=T0[0])                 
   S[1] = S[1]*norm                                                                              
   try: S[2] = S[2]*norm                                                        
   except IndexError: pass
@@ -159,7 +177,8 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
     for n,x1,x2 in trim: all_spec[n] = [i[idx_exclude(all_spec[n][0],[(x1,x2)])] for i in all_spec[n]]
     template, spectra = all_spec[0], all_spec[1:]
   
-  (W, F, E), normalized = [i.value if hasattr(i,'_unit') else i for i in unc(template, SNR=SNR)], []
+  # (W, F, E), normalized = [i.value if hasattr(i,'_unit') else i for i in unc(template, SNR=SNR)], []
+  (W, F, E), normalized = unc(template, SNR=SNR), []
   for S in spectra: normalized.append(norm_spec([i.value if hasattr(i,'_unit') else i for i in unc(S, SNR=SNR)], [W,F,E], exclude=exclude+modelReplace))
   if plot: plt.loglog(W, F, alpha=0.5), plt.fill_between(W, F-E, F+E, alpha=0.1)
     
@@ -194,7 +213,12 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
   else: normalized = [[W,F,E]]
   return normalized[0][:len(template)] if composite else [i[:len(template)] for i in normalized]
 
-def pi2pc(pi): return (1*q.pc*q.arcsec)/(pi*q.arcsec/1000.)
+def pi2pc(parallax): 
+  if isinstance(parallax,tuple):
+    pi, sig_pi = parallax[0]*q.arcsec/1000., parallax[1]*q.arcsec/1000.
+    d, sig_d = (1*q.pc*q.arcsec)/pi, sig_pi*q.pc*q.arcsec/pi**2
+    return (d, sig_d)
+  else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
 
 def printer(labels, values, format='', to_txt=None):
   '''
@@ -233,8 +257,8 @@ def separation(ra1, dec1, ra2, dec2):
   if isinstance(ra2,str): ra2 = float(ra2) if ra2.isdigit() else sxg2deg(ra=ra2)
   if isinstance(dec2,str): dec2 = float(dec2) if dec2.isdigit() else sxg2deg(dec=dec2) 
 
-  try: return np.sqrt((ra1-ra2)**2 + (dec1-dec2)**2)*q.degree.to('arcsec')
-  except TypeError: return False
+  try: return (float(apc.angles.AngularSeparation(ra1, dec1, ra2, dec2, q.degree).format(decimal=True,unit='degree'))*q.degree).to(q.arcsec).value
+  except TypeError: return None
 
 def sameName(name1, name2, chars=4):
   '''
@@ -258,6 +282,7 @@ def scrub(data):
   '''
   For input data [w,f,e] or [w,f] returns the list with NaN, negative, and zero flux (and corresponsing wavelengths and errors) removed. 
   '''
+  data = [i for i in data if isinstance(i,(np.ndarray,q.Quantity))]
   return [i[np.where((data[1].value>0) & (~np.isnan(data[1].value)))] if hasattr(i,'_unit') else i[np.where((data[1]>0) & (~np.isnan(data[1])))] for i in data]
 
 def smooth(x,beta):
@@ -334,6 +359,16 @@ def sxg2deg(ra='', dec=''):
   if dec: DEC = float(apc.angles.Angle(dec, unit='degree').format(decimal=True, precision=8))
   return (RA, DEC) if ra and dec else RA or DEC
 
+def tails(spectrum, model, plot=False):
+  '''
+  Appends the Wein and Rayleigh-Jeans tails of the *model* to the given *spectrum*
+  '''
+  mW, mF = norm_spec(model, spectrum)
+  start, end = np.where(mW<spectrum[0][0])[0], np.where(mW>spectrum[0][-1])[0]
+  final = [np.concatenate(i) for i in [[mW[start],spectrum[0],mW[end]], [mF[start],spectrum[1],mF[end]], [np.zeros(len(start)),spectrum[2],np.zeros(len(end))]]]  
+  if plot: plt.loglog(*spectrum[:2]), plt.loglog(mW,mF), plt.loglog(*final[:2], color='k', ls='--')
+  return final
+
 def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False, obj_col=0, key_row=0, start=1):
   '''
   For given *txtfile* returns a parent dictionary with keys from *obj_col* and child dictionaries with keys from *key_row*, delimited by *delim* character.
@@ -369,8 +404,11 @@ def unc(spectrum, SNR=100):
   Generates E at signal to noise *SNR* for [W,F] and replaces NaNs with the same for [W,F,E]. 
   '''
   S = scrub(spectrum)
-  if len(S)==3: S[2] = np.array([(i/SNR) if np.isnan(j) else j for i,j in zip(*S[1:])], dtype='float32')
-  elif len(S)==2: S.append(np.array([(i/SNR) for i in S[1]], dtype='float32'))
+  # if len(S)==3: S[2][np.where(np.isnan(S[2]))] = S[1][np.where(np.isnan(S[2]))]/SNR
+  if len(S)==3:
+    try: S[2] = np.array([i/SNR if np.isnan(j) else j for i,j in zip(S[1],S[2])], dtype='float32')
+    except TypeError: S[2] = np.array(S[1]/SNR)
+  elif len(S)==2: S.append(np.array(S[1]/SNR))
   return S
 
 def xl2dict(filepath, sheet=1, obj_col=0, key_row=0, start=1, manual_keys=''):

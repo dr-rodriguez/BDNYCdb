@@ -179,29 +179,6 @@ def avg_flux(startW, endW, SpecData, median=False, verbose=True):
         
     return [avgflux, sigflux]
 
-def blackbody(lam, T, Flam=True):
-  """
-  (By Joe Filippazzo)
-   
-  Returns emitted blackbody flux density via Planck's formula for given wavelengths *lam* in [um] at a temperature *T* in [K]. 
-  
-  *lam*
-    The input wavelength or wavelength numpy array in [um]
-  *T*
-    The blackbody temperature in [K] to compute
-  *Flam*
-    Boolean: Return flux density in [ergs][s-1][cm-2][cm-1] if False, (lambda)*(flux density) in [ergs][s-1][cm-2] if True
-  """
-  import numpy as np                 
-  h = 6.6260755E-27   # [erg*sec]
-  c = 2.997924E10     # [cm/sec]
-  k = 1.380658E-16    # [erg/K]
-  lam = lam*1e-4      # [um] => [cm]
-  if Flam:
-    return 2*h*c**2 / (lam**4 * (np.exp(h*c / (lam*k*T)) - 1))
-  else:
-    return 2*h*c**2 / (lam**5 * (np.exp(h*c / (lam*k*T)) - 1))  
-
 def browse_db(deg=True):
   '''
   (By Joe Filippazzo)
