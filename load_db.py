@@ -282,6 +282,7 @@ def load_log():
       insert = "CREATE TRIGGER db_insert_{0}_{1} AFTER INSERT ON {0} BEGIN INSERT INTO changelog (event_date, event_type, before_event, after_event) VALUES (DATETIME('NOW'), 'INSERT', None, NEW.{1}); END".format(table,field)
       update = "CREATE TRIGGER db_update_{0}_{1} AFTER UPDATE ON {0} BEGIN INSERT INTO changelog (event_date, event_type, before_event, after_event) VALUES (DATETIME('NOW'), 'UPDATE', OLD.{1}, NEW.{1}); END".format(table,field)
       delete = "CREATE TRIGGER db_delete_{0}_{1} DELETE ON {0} BEGIN INSERT INTO changelog (event_date, event_type, before_event, after_event) VALUES (DATETIME('NOW'), 'DELETE', OLD.{1}, None); END".format(table,field)
+      db.query.execute("DROP TRIGGER IF EXISTS {0}.db_insert_{0}_{1}".format(table,field)), db.query.execute("DROP TRIGGER IF EXISTS {0}.db_update_{0}_{1}".format(table,field)), db.query.execute("DROP TRIGGER IF EXISTS {0}.db_delete_{0}_{1}".format(table,field))
       db.query.execute(insert), db.query.execute(update), db.query.execute(delete)
   db.modify.commit()
 

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Utilities
-import warnings, re, xlrd, cPickle, astropy.units as q, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc
+import warnings, re, xlrd, cPickle, astropy.units as q, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a
 from random import random
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
@@ -101,7 +101,6 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   Note: Must be multiplied by wavelength in [cm] to be converted to [ergs][s-1][cm-2], not done here! 
   mag = -2.5*log10(F/zp)  =>  flux = zp*10**(-mag/2.5)
   '''
-  from astrotools import astrotools as a
   filt = a.filter_info(band) 
   zp = filt['zp_photon' if photon else 'zp']*(1 if photon else q.erg)/q.s/q.cm**2/q.AA
   F = (zp*(filt['eff']*q.um if Flam else 1)*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA))
