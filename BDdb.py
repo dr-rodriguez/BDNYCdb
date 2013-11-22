@@ -164,7 +164,10 @@ class get_db:
     if D:
       u.printer(['id','unum','ra','dec','Optical','NIR','Phot Count','Parallax','OPT','IR'], D)
       if ID and plot:
-        for i in self.dict.execute("SELECT s.wavelength,s.flux,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id=?", [ID]).fetchall(): plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.xlim(0.4,3.0), plt.grid(True), plt.yscale('log',nonposy='clip'), plt.figtext(0.15,0.88,'{}\n{}\n{}\n{}'.format(i[2],i[3],i[4],i[5]),verticalalignment='top')
+        for i in self.dict.execute("SELECT s.wavelength,s.flux,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id=?", [ID]).fetchall(): 
+          plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.xlim(0.4,3.0), plt.grid(True), plt.yscale('log',nonposy='clip')
+          try: plt.figtext(0.15,0.88,'{}\n{}\n{}\n{}'.format(i[2],i[3],i[4],i[5]),verticalalignment='top')
+          except: pass
       if data: return D
     else: print "No sources found."
 
