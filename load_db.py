@@ -239,7 +239,7 @@ def load_publications():
 def load_spectral_types():
   # 12.5 or 'L2.5' format? What about Greek letter gravity indicators, 'peculiar', 'blue/red', etc?
   PD, spec_types = parallax_data(), []
-  db.query.execute("DROP TABLE IF EXISTS spectral_types"), db.query.execute("CREATE TABLE spectral_types (id INTEGER PRIMARY KEY, source_id INTEGER, spectral_type REAL, publication_id INTEGER, regime TEXT, adopted BOOLEAN)")
+  db.query.execute("DROP TABLE IF EXISTS spectral_types"), db.query.execute("CREATE TABLE spectral_types (id INTEGER PRIMARY KEY, source_id INTEGER, spectral_type REAL, gravity TEXT, publication_id INTEGER, regime TEXT, adopted BOOLEAN)")
   for obj in PD.keys():
     if PD[obj]['OPT_SpT_num']!='NaN' and PD[obj]['OPT_SpT_num']!='null': spec_types.append((None, PD[obj]['source_id'], PD[obj]['OPT_SpT_num'], PD[obj]['OPT_SpT_ref'], 'OPT', None))
     if PD[obj]['IR_SpT_num']!='NaN' and PD[obj]['IR_SpT_num']!='null': spec_types.append((None, PD[obj]['source_id'], PD[obj]['IR_SpT_num'], PD[obj]['IR_SpT_ref'], 'IR', None))
@@ -291,12 +291,12 @@ def load_log():
 # ==============================================================================================================================================
 
 def load_synthetic_spectra():
-  import os, glob, quantities as q
+  import os, glob, astropy.units as q
   from syn_phot import syn_phot as s
   syn, files, bt_settl = BDdb.get_db(path+'Models/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0/*.spec.7'), []
   for f in files:
-    obj = s.read_btsettl(f, Flam=False, radius=1, dist=10)
-    bt_settl.append((None, obj['Teff'], obj['logg'], obj['W'].magnitude, obj['F'].magnitude, ((obj['W']*obj['F']).rescale(q.erg/q.s/q.cm**2)).magnitude, obj['B'].magnitude))
+    obj = s.read_btsettl(f, Flam=False)
+    bt_settl.append((None, obj['Teff'], obj['logg'], obj['W'].value, obj['F'].value, ((obj['W']*obj['F']).to(q.erg/q.s/q.cm**2)).value, obj['B'].value))
     print "{} {}".format(obj['Teff'], obj['logg'])
   syn.query.execute("DROP TABLE IF EXISTS bt_settl"), syn.query.execute("CREATE TABLE bt_settl (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, W ARRAY, F ARRAY, lamF ARRAY, blackbody ARRAY)")    
   syn.query.executemany("INSERT INTO bt_settl VALUES (?, ?, ?, ?, ?, ?, ?)", bt_settl), syn.modify.commit(), syn.modify.close()

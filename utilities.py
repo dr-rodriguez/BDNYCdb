@@ -13,10 +13,11 @@ def app2abs(magnitude, distance):
     return (M, sig_M)
   else: return (magnitude-5*np.log10(distance/(10*q.pc)))                                                    
 
-def ChiSquare(a, b, unc=None, array=False, Gtest=False):
+def ChiSquare(a, b, unc=None, array=False, Gtest=False, norm=True, log=True):
   a, b = [np.array(map(float,i.value)) if hasattr(i,'_unit') else np.array(map(float,i)) for i in [a,b]]
   c, variance = np.array(map(float,unc.value)) if hasattr(unc, '_unit') else np.array(map(float,np.ones(len(a)))), np.std(b)**4 # Since the standard deviation is the root of the variance
   X2 = np.array([(j*np.log(j/i)/k)**2/i for i,j,k in zip(a,b,c)]) if Gtest else np.array([((i-j)/k)**2/variance for i,j,k in zip(a,b,c)])    
+  if norm: X2 = abs(np.log10(X2/min(X2))/np.log10(min(X2))) if log else X2/max(X2)
   return X2 if array else sum(X2)
   
 def deg2sxg(ra='', dec=''):
@@ -38,7 +39,7 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits=5, order=''):
       for i in D[k].keys():
         D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
         w.append(i), w.append(str(D[k][i]))
-    width = len(max(w, key=len))
+    width = len(max(map(str,w), key=len))
     head = ['{!s:{}}'.format(column1,width)]
     headorder = order or sorted(D[D.keys()[0]].keys())
     for i in headorder: head.append('{!s:{}}'.format(i,width))
@@ -81,11 +82,12 @@ def find(filename, tree):
 
   return result
 
-def goodness(spectrum, model, radius='', dist=''):
+def goodness(spectrum, model, array=False):
   (w, f, sig), (W, F) = spectrum, model
   weight = np.concatenate([np.array([1]),np.diff(w)])
-  C = (radius/dist)**2 if radius and dist else (sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2))
-  return sum(weight*((f-F*C)/sig)**2) if radius and distance else [sum(weight*((f-F*C)/sig)**2), C]
+  C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
+  G = weight*((f-F*C)/sig)**2
+  return [G if array else sum(G), C]
 
 def idx_include(x, include):
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
@@ -107,48 +109,53 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA)) if unc else 1
   return [F,E] if unc else F
 
-def modelFit(spectrum, exclude=[], Flam=False, SNR=50, D_Flam=None, plot=False):
+def modelFit(spectrum, exclude=[], Flam=False, SNR=50, dist='', D_Flam=None, plot=False, prnt=True, title=None, save=''):
   '''
   For given *spectrum* [W,F,E] returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  S, spec_list = D_Flam, []
-  
-  if isinstance(spectrum,dict):
-    from syn_phot.syn_phot import get_filters, color_table
-    filters, CT = get_filters(), color_table(photon=True)
-    
-    for p in CT:
-      wavs, modelMags, specMags, bands = [], [], [], []
-      for b in [b for b in list(set(spectrum.keys()).intersection(CT[p].keys())) if all([spectrum[b],CT[p][b]])]:
-        wavs.append(filters[b]['eff']), modelMags.append(CT[p][b]), specMags.append(spectrum[b]), bands.append(b)
-      (wavs, modelMags, specMags, bands), norm = map(np.array,zip(*sorted(zip(wavs,modelMags,specMags,bands)))), spectrum['J']/CT[p]['J']
-      spec_list.append((ChiSquare(modelMags*norm, specMags), p, norm))
-
-  else:    
-    spec = [i.value if hasattr(i,'_unit') else i for i in unc(spectrum, SNR=SNR)]
-    wave, flux, error = [i[idx_exclude(spec[0],exclude)] for i in spec] if exclude else spec
-
-    for k in S.keys():
-      model = np.interp(wave, S[k]['W'], S[k]['F'], left=0, right=0)
-      # norm = np.trapz(flux)/np.trapz(model)
-      # G = ChiSquare(model*norm, flux, unc=error)
-      G, C = goodness([wave,flux,error],[wave,model])
-      spec_list.append((abs(G), k, C))
-    
-    if plot:  
-      plt.figure()
-      from itertools import groupby
-      for key,group in [[k,list(grp)] for k,grp in groupby(sorted(spec_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
-        G, P, C = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
-        plt.plot([int(t.split()[0]) for t in P], G, '-o', color=plt.cm.spectral((float(key)-1)*2./10,1), label=key)
-      plt.legend(loc=0, ncol=2), plt.xlim(500,3000), plt.grid(True), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff')
-
   from heapq import nsmallest
-  G, params, norm = min(spec_list)
-  printer(['Goodness','Parameters'], nsmallest(5,spec_list))
-  return [S[params]['W'], S[params]['F']*norm*(S[params]['W']*10000 if Flam else 1), params]
+  spec_list, spec = [], [i.value if hasattr(i,'_unit') else i for i in unc(spectrum, SNR=SNR)]
+  wave, flux, error = [i[idx_exclude(spec[0],exclude)] for i in spec] if exclude else spec
 
-def norm_spec(spectrum, template, exclude=[]):
+  for k in D_Flam.keys():
+    model = np.interp(wave, D_Flam[k]['W'], D_Flam[k]['F'], left=0, right=0)
+    good, const = goodness([wave,flux,error],[wave,model])
+    spec_list.append((abs(good), k, float(const)))
+
+  top5 = nsmallest(5,spec_list)
+  if prnt: printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], top5)
+  G, P, C = min(top5)
+  
+  if plot: 
+    from itertools import groupby
+    fig = plt.figure(figsize=(12,8))
+    ax1, ax2 = plt.subplot2grid((1,2), (0,0)), plt.subplot2grid((1,2), (0,1))
+    # if exclude:
+    #   for mn,mx in exclude: ax1.add_patch(plt.Rectangle((mn,1E-20), mx-mn, 1E-10, color='k', alpha=0.1))
+    for key,group in [[k,list(grp)] for k,grp in groupby(sorted(spec_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
+      g, p, c = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
+      ax2.plot([int(t.split()[0]) for t in p], g, '-o', color=plt.cm.spectral((5.6-float(key))/2.4,1), label=key)
+    ax2.legend(loc=0, ncol=2), ax2.set_xlim(500,3000), ax2.grid(True), ax2.set_ylabel('Goodness of Fit'), ax2.set_xlabel('Teff'), ax2.yaxis.tick_right(), ax2.yaxis.set_label_position('right'), plt.suptitle(title)
+    for idx,(g,p,c) in enumerate(top5):
+      w, f = D_Flam[p]['W'][::25], smooth(D_Flam[p]['F'][::25], 4)
+      ax1.loglog(w, f*c*(w*10000 if Flam else 1), label='{} / {} / {:.2f}'.format(p.split()[0],p.split()[1],float(dist*np.sqrt(c)) if dist else float(c)), color=plt.cm.spectral((idx+1.)/5.1,1))
+    ax1.loglog(*spectrum[:2], color='k'), ax1.grid(True), ax1.set_xlabel('Microns'), ax1.set_ylabel('Flux'), ax1.set_xlim(min(spectrum[0].value)*0.8,max(spectrum[0].value)*1.2), ax1.set_ylim(min(spectrum[1].value)*0.8,max(spectrum[1].value)*1.2), ax1.legend(loc=0)
+  
+  if save: plt.savefig('{}{}_fit.png'.format(save,title))
+  return [D_Flam[P]['W'], D_Flam[P]['F']*C*(D_Flam[P]['W']*10000 if Flam else 1), P]
+
+def modelReplace(spectrum, model, replace=[], Flam=False, tails=False, plot=False):
+  '''
+  Returns the given *spectrum* with the tuple ranges in *replace* replaced by the given *model*.
+  '''
+  if tails: replace += [(0.1,spectrum[0][0].value),(spectrum[0][-1].value,22)]
+  fW, fF, fE = [i[idx_include(model[0].value,replace)] for i in [model[0].value, model[1].value, model[1].value]]
+  W, F, E = [i[idx_exclude(spectrum[0].value,replace)] for i in spectrum]
+  W, F, E = map(np.array,zip(*sorted(zip(*[np.concatenate(i) for i in [[W.value,fW],[F.value,fF],[E.value,fE]]]), key=lambda x: x[0])))
+  if plot: plt.figure(), plt.loglog(*model, color='k', alpha=0.3), plt.loglog(*spectrum[:2], color='b'), plt.loglog(W, F, color='k', ls='--'), plt.legend(loc=0)
+  return [i*j for i,j in zip([W,F,E],[k.unit for k in spectrum])]
+  
+def norm_spec(spectrum, template, exclude=[], include=[]):
   '''
   Returns *spectrum* with [W,F] or [W,F,E] normalized to *template* [W,F] or [W,F,E].
   Wavelength range tuples provided in *exclude* argument are ignored during normalization, i.e. exclude=[(0.65,0.72),(0.92,0.97)].
@@ -156,13 +163,14 @@ def norm_spec(spectrum, template, exclude=[]):
   S, T = scrub([i.value if hasattr(i,'_unit') else i for i in spectrum]), scrub([i.value if hasattr(i,'_unit') else i for i in template])
   S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
   if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
+  if include: S0, T0 = [[i[idx_include(j[0],include)] for i in j] for j in [S0,T0]]
   norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2]), x=T0[0])                 
   S[1] = S[1]*norm                                                                              
   try: S[2] = S[2]*norm                                                        
   except IndexError: pass
   return S
 
-def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[], trim=[], modelReplace=[], D_Flam=None):
+def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[], trim=[], replace=[], D_Flam=None):
   '''
   Normalizes a list of *spectra* with [W,F,E] or [W,F] to a *template* spectrum.
   Returns one normalized, composite spectrum if *composite*, else returns the list of *spectra* normalized to the *template*.
@@ -178,7 +186,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
   
   # (W, F, E), normalized = [i.value if hasattr(i,'_unit') else i for i in unc(template, SNR=SNR)], []
   (W, F, E), normalized = unc(template, SNR=SNR), []
-  for S in spectra: normalized.append(norm_spec([i.value if hasattr(i,'_unit') else i for i in unc(S, SNR=SNR)], [W,F,E], exclude=exclude+modelReplace))
+  for S in spectra: normalized.append(norm_spec([i.value if hasattr(i,'_unit') else i for i in unc(S, SNR=SNR)], [W,F,E], exclude=exclude+replace))
   if plot: plt.loglog(W, F, alpha=0.5), plt.fill_between(W, F-E, F+E, alpha=0.1)
     
   if composite:
@@ -196,12 +204,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
       spec1, spec2 = [i[np.where(spec1[0]<W0[0])[0]] for i in spec1], [i[np.where(spec2[0]>W0[-1])[0]] for i in spec2]
       W, F, E = [np.concatenate([i,j,k]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
 
-    if modelReplace:
-      (fitW, fitF, fitP) = modelFit([W,F,E], exclude=exclude+modelReplace, Flam=False, SNR=SNR, D_Flam=D_Flam or cPickle.load(open('/Users/Joe/Documents/Python/Pickles/synSpec_Flam_3000.p',"rb")))
-      if plot: plt.loglog(fitW[::20], fitF[::20], alpha=0.3)
-      fitW, fitF = [i[idx_include(W,modelReplace)] for i in [W,np.interp(W, fitW, fitF, left=0, right=0)]]
-      W, F = [i[idx_exclude(W,modelReplace)] for i in [W,F]]
-      W, F, E = map(np.array,zip(*sorted(zip(*[np.concatenate(i) for i in [[W,fitW],[F,fitF],[E]]]), key=lambda x: x[0])))
+    if replace: W, F, E = modelReplace([W,F,E], replace=replace, D_Flam=D_Flam)
 
   if plot:
     for w,f,e in normalized: plt.loglog(w, f, alpha=0.5), plt.fill_between(w, f-e, f+e, alpha=0.2)
@@ -362,10 +365,9 @@ def tails(spectrum, model, plot=False):
   '''
   Appends the Wein and Rayleigh-Jeans tails of the *model* to the given *spectrum*
   '''
-  mW, mF = norm_spec(model, spectrum)
-  start, end = np.where(mW<spectrum[0][0])[0], np.where(mW>spectrum[0][-1])[0]
-  final = [np.concatenate(i) for i in [[mW[start],spectrum[0],mW[end]], [mF[start],spectrum[1],mF[end]], [np.zeros(len(start)),spectrum[2],np.zeros(len(end))]]]  
-  if plot: plt.loglog(*spectrum[:2]), plt.loglog(mW,mF), plt.loglog(*final[:2], color='k', ls='--')
+  start, end = np.where(model[0]<spectrum[0][0])[0], np.where(model[0]>spectrum[0][-1])[0]
+  final = [np.concatenate(i) for i in [[model[0][start],spectrum[0],model[0][end]], [model[1][start],spectrum[1],model[1][end]], [np.zeros(len(start)),spectrum[2],np.zeros(len(end))]]]  
+  if plot: plt.loglog(*spectrum[:2]), plt.loglog(model[0],model[1]), plt.loglog(*final[:2], color='k', ls='--')
   return final
 
 def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False, obj_col=0, key_row=0, start=1):
@@ -416,4 +418,4 @@ def xl2dict(filepath, sheet=1, obj_col=0, key_row=0, start=1, manual_keys=''):
   objects = workbook.sheet_by_index(sheet).col_values(obj_col)[start:]
   if manual_keys: values = [workbook.sheet_by_index(sheet).col_values(n)[start:] for n in range(len(manual_keys))]
   else: values = [workbook.sheet_by_index(sheet).col_values(c)[start:] for c in [column_names.index(i) for i in column_names]]
-  return {str(obj): {str(cn):str(val) if isinstance(val,unicode) else val for cn,val in zip(column_names,value)} for obj,value in zip(objects,zip(*values))}
+  return {str(obj): {str(cn):str(val.encode('utf-8')) if isinstance(val,unicode) else val for cn,val in zip(column_names,value)} for obj,value in zip(objects,zip(*values))}
