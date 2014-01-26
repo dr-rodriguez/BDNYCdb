@@ -24,8 +24,22 @@ class get_db:
       insert.append(tuple(values))
     u.printer(fields,insert), self.query.executemany(query, insert), self.modify.commit()
     print "{} records added to the {} table.".format(len(data),table.upper())
+   
+  def add_ascii(self, asciiPath, header_chars=['#'], skip=[], start=0, source_id='', wavelength_unit='', flux_unit='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''): 
+    filename, data = os.path.basename(asciiPath), zip(*u.txt2dict(asciiPath, to_list=True, skip=header_chars+skip))
+    wavelength, flux, unc = [np.array(i, dtype='float32') for i in data][start:start+3]
+    snr, regime = flux/unc, 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
+    try:
+      hdu, h = pf.PrimaryHDU(), [i for i in pf.open(asciiPath) if any([i.startswith(char) for char in header_chars])]
+      hdu.header.append(('COMMENT',' '.join([' '.join(i) for n,i in enumerate(h) if any([h[n][0].startswith(char) for char in header_chars])]),''))
+      header = hdu.header
+    except: header = ''
+    try:
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_unit, flux, flux_unit, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
+      u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_unit, flux_unit, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
+    except: print "Couldn't add spectrum to database."
     
-  def add_ascii(self, asciiPath, snrPath=''):
+  def add_BDSS_ascii(self, asciiPath, snrPath=''):
     '''
     Given the path to an ascii data file *asciiPath* with filename format NAME_ORDER.DATE inserts spectrum into the database. If *snrPath* is provided, generates uncertainty and inserts both arrays.
     '''
@@ -156,20 +170,29 @@ class get_db:
     '''
     Prints a summary of all objects in the database at *dbpath*. If *ID* prints only that object's summary and plots if *plot*
     '''
-    q = "SELECT id, unum, ra, dec, (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources"
+    q = "SELECT id, unum, designation, ra, dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources"
     if ID: q += ' WHERE id={}'.format(ID)
-    elif with_pi and not ID: q = "SELECT s.id, s.unum, s.ra, s.dec, (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None'"
-    elif SED and not ID: q = "SELECT s.id, s.unum, s.ra, s.dec, (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR' OR spectra.regime='MIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None' AND (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT')>0 AND (SELECT filename FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR' OR spectra.regime='MIR') >0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id) >0"
-    D = self.query.execute(q).fetchall()  
+    elif with_pi and not ID: q = "SELECT s.id, s.unum, s.designation, s.ra, s.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None'"
+    elif SED and not ID: q = "SELECT s.id, s.unum, s.designation, s.ra, s.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None' AND (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR')>0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id) >0"
+    D = self.query.execute(q).fetchall()
     if D:
-      u.printer(['id','unum','ra','dec','Optical','NIR','Phot Count','Parallax','OPT','IR'], D)
+      u.printer(['id','unum','name','ra','dec','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR'], D)
       if ID and plot:
-        for i in self.dict.execute("SELECT s.wavelength,s.flux,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id=?", [ID]).fetchall(): 
-          plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.xlim(0.4,3.0), plt.grid(True), plt.yscale('log',nonposy='clip')
-          try: plt.figtext(0.15,0.88,'{}\n{}\n{}\n{}'.format(i[2],i[3],i[4],i[5]),verticalalignment='top')
+        for i in self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id=?", [ID]).fetchall(): 
+          plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.xlim(0.4,3.0), plt.grid(True), plt.yscale('log', nonposy='clip')
+          try: 
+            Y = plt.ylim()
+            plt.fill_between(i[0], i[1]-i[2], i[1]+i[2], alpha=0.2, color='b'), plt.ylim(Y)
+          except: pass
+          try: plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i[3].replace('_',' '),i[4],i[5],i[6]), verticalalignment='top')
           except: pass
       if data: return D
     else: print "No sources found."
+    
+  def identify(self, search):
+    try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
+    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
+    u.printer(['id','ra','dec','designation','unum','short','names'], self.query.execute(q).fetchall())
 
 # ==============================================================================================================================================
 # ================================= Adapters and converters for special data types =============================================================

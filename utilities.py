@@ -1,7 +1,8 @@
 #!/usr/bin/python
 # Utilities
-import warnings, re, xlrd, cPickle, astropy.units as q, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a
+import warnings, glob, os, re, xlrd, cPickle, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a
 from random import random
+from heapq import nsmallest
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
@@ -11,14 +12,22 @@ def app2abs(magnitude, distance):
     sig_M = np.sqrt(sig_m**2 + 25*(sig_d/d).value**2)
     M = (m-5*np.log10(d/(10*q.pc)))
     return (M, sig_M)
-  else: return (magnitude-5*np.log10(distance/(10*q.pc)))                                                    
+  else: return (magnitude-5*np.log10(distance/(10*q.pc)))  
+  
+def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
+  '''
+  Given a wavelength array [um] and temperature [K], returns an array of Planck function values in [erg s-1 cm-2 A-1]
+  '''
+  lam, T = lam.to(q.cm), T*q.K
+  I = np.pi*(2*ac.h*ac.c**2 / (lam**(4 if Flam else 5) * (np.exp((ac.h*ac.c / (lam*ac.k_B*T)).decompose()) - 1))).to(q.erg/q.s/q.cm**2/(1 if Flam else q.AA))
+  return I if emitted else I*((radius*ac.R_jup)**2/(dist*q.pc)**2).decompose()
 
 def ChiSquare(a, b, unc=None, array=False, Gtest=False, norm=True, log=True):
   a, b = [np.array(map(float,i.value)) if hasattr(i,'_unit') else np.array(map(float,i)) for i in [a,b]]
   c, variance = np.array(map(float,unc.value)) if hasattr(unc, '_unit') else np.array(map(float,np.ones(len(a)))), np.std(b)**4 # Since the standard deviation is the root of the variance
   X2 = np.array([(j*np.log(j/i)/k)**2/i for i,j,k in zip(a,b,c)]) if Gtest else np.array([((i-j)/k)**2/variance for i,j,k in zip(a,b,c)])    
   if norm: X2 = abs(np.log10(X2/min(X2))/np.log10(min(X2))) if log else X2/max(X2)
-  return X2 if array else sum(X2)
+  return X2 if array else sum(X2) 
   
 def deg2sxg(ra='', dec=''):
   RA, DEC = '', ''
@@ -43,13 +52,15 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits=5, order=''):
     head = ['{!s:{}}'.format(column1,width)]
     headorder = order or sorted(D[D.keys()[0]].keys())
     for i in headorder: head.append('{!s:{}}'.format(i,width))
+    if delim == ',': head = [i.replace(' ','') for i in head]
     writer.writerow(head)
     for i in D.keys():
       order = order or sorted(D[i].keys())
       row = ['{!s:{}}'.format(i,width)]
       for k in order:
-        if k not in D[i].keys(): D[i][k] = '-'
+        if k not in D[i].keys(): D[i][k] = '' if delim==',' else '-'
         row.append('{!s:{}}'.format(D[i][k],width))
+      if delim == ',': row = [i.replace(' ','') for i in row]
       writer.writerow(row)
       
 def distance(coord1, coord2):
@@ -82,9 +93,34 @@ def find(filename, tree):
 
   return result
 
-def goodness(spectrum, model, array=False):
-  (w, f, sig), (W, F) = spectrum, model
-  weight = np.concatenate([np.array([1]),np.diff(w)])
+def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','HST','Bessel']], systems=['2MASS','SDSS','WISE','IRAC','HST','Bessel']):
+  '''
+  Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1]. 
+  '''
+  files = glob.glob(filter_directories+'*.txt') if isinstance(filter_directories, basestring) else [j for k in [glob.glob(i+'*.txt') for i in filter_directories] for j in k]
+
+  if len(files) == 0: print 'No filters in', filter_directories
+  else:
+    filters = {}
+    for filepath in files:
+      filter_name = os.path.splitext(os.path.basename(filepath))[0]
+      RSR_x, RSR_y = [np.array(map(float,i)) for i in zip(*txt2dict(filepath,to_list=True,skip=['#']))]
+      RSR_x, RSR_y = (RSR_x*(q.um if min(RSR_x)<100 else q.AA)).to(q.um), RSR_y*q.um/q.um
+      Filt = a.filter_info(filter_name)
+      filters[filter_name] = {'wav':RSR_x, 'rsr':RSR_y, 'system':Filt['system'], 'eff':Filt['eff']*q.um, 'min':Filt['min']*q.um, 'max':Filt['max']*q.um, 'ext':Filt['ext'], 'ABtoVega':Filt['ABtoVega'], 'zp':Filt['zp']*q.erg/q.s/q.cm**2/q.AA, 'zp_photon':Filt['zp_photon']/q.s/q.cm**2/q.AA }
+
+    for i in filters.keys():
+      if filters[i]['system'] not in systems: filters.pop(i)    
+    return filters
+
+def goodness(spectrum, model, array=False, filt_dict=None):
+  if isinstance(spectrum,dict) and isinstance(model,dict):
+    bands = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])]
+    bands = [i for i in bands if all([spectrum[i],model[i]])]
+    w, f, sig, weight, F = np.array([filt_dict[i]['eff'] for i in bands]), np.array([spectrum[i] for i in bands]), np.array([spectrum[i+'_unc'] or 0*q.erg/q.s/q.cm**2/q.AA for i in bands]), np.array([filt_dict[i]['max']-filt_dict[i]['min'] for i in bands]), np.array([model[i] for i in bands])
+  else:
+    (w, f, sig), (W, F) = spectrum, model
+    weight = np.concatenate([np.array([1]),np.diff(w)])
   C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
   G = weight*((f-F*C)/sig)**2
   return [G if array else sum(G), C]
@@ -107,43 +143,67 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   zp = filt['zp_photon' if photon else 'zp']*(1 if photon else q.erg)/q.s/q.cm**2/q.AA
   F = (zp*(filt['eff']*q.um if Flam else 1)*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA))
   E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA)) if unc else 1
-  return [F,E] if unc else F
+  return [F,E] if unc else F 
 
-def modelFit(spectrum, exclude=[], Flam=False, SNR=50, dist='', D_Flam=None, plot=False, prnt=True, title=None, save=''):
+def modelFit(spectrum, photometry, dist='', exclude=[], spec_dict=None, phot_dict=None, filt_dict=None):
   '''
-  For given *spectrum* [W,F,E] returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
+  For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  from heapq import nsmallest
-  spec_list, spec = [], [i.value if hasattr(i,'_unit') else i for i in unc(spectrum, SNR=SNR)]
-  wave, flux, error = [i[idx_exclude(spec[0],exclude)] for i in spec] if exclude else spec
-
-  for k in D_Flam.keys():
-    model = np.interp(wave, D_Flam[k]['W'], D_Flam[k]['F'], left=0, right=0)
-    good, const = goodness([wave,flux,error],[wave,model])
-    spec_list.append((abs(good), k, float(const)))
-
-  top5 = nsmallest(5,spec_list)
-  if prnt: printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], top5)
-  G, P, C = min(top5)
+  fit_list = []
+  for b in photometry.keys():
+    if 'unc' not in b:
+      if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
+  for k in phot_dict.keys():
+    good, const = goodness(photometry, phot_dict[k], filt_dict=filt_dict)
+    fit_list.append((abs(good), k, float(const), phot_dict[k]))
+    # How do I turn a goodness of fit into an uncertainty?
   
-  if plot: 
-    from itertools import groupby
-    fig = plt.figure(figsize=(12,8))
-    ax1, ax2 = plt.subplot2grid((1,2), (0,0)), plt.subplot2grid((1,2), (0,1))
-    # if exclude:
-    #   for mn,mx in exclude: ax1.add_patch(plt.Rectangle((mn,1E-20), mx-mn, 1E-10, color='k', alpha=0.1))
-    for key,group in [[k,list(grp)] for k,grp in groupby(sorted(spec_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
-      g, p, c = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
-      ax2.plot([int(t.split()[0]) for t in p], g, '-o', color=plt.cm.spectral((5.6-float(key))/2.4,1), label=key)
-    ax2.legend(loc=0, ncol=2), ax2.set_xlim(500,3000), ax2.grid(True), ax2.set_ylabel('Goodness of Fit'), ax2.set_xlabel('Teff'), ax2.yaxis.tick_right(), ax2.yaxis.set_label_position('right'), plt.suptitle(title)
-    for idx,(g,p,c) in enumerate(top5):
-      w, f = D_Flam[p]['W'][::25], smooth(D_Flam[p]['F'][::25], 4)
-      ax1.loglog(w, f*c*(w*10000 if Flam else 1), label='{} / {} / {:.2f}'.format(p.split()[0],p.split()[1],float(dist*np.sqrt(c)) if dist else float(c)), color=plt.cm.spectral((idx+1.)/5.1,1))
-    ax1.loglog(*spectrum[:2], color='k'), ax1.grid(True), ax1.set_xlabel('Microns'), ax1.set_ylabel('Flux'), ax1.set_xlim(min(spectrum[0].value)*0.8,max(spectrum[0].value)*1.2), ax1.set_ylim(min(spectrum[1].value)*0.8,max(spectrum[1].value)*1.2), ax1.legend(loc=0)
+  top5 = nsmallest(5,[i for i in fit_list if (dist*np.sqrt(i[2])/ac.R_jup).decompose().value<1.4 and (dist*np.sqrt(i[2])/ac.R_jup).decompose().value>0.8] if dist else fit_list) or nsmallest(5, fit_list)
+  printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
   
-  if save: plt.savefig('{}{}_fit.png'.format(save,title))
-  return [D_Flam[P]['W'], D_Flam[P]['F']*C*(D_Flam[P]['W']*10000 if Flam else 1), P]
+  p1, p2 = phot_dict[top5[0][1]], phot_dict[top5[1][1]]
+  (t1, g1), (t2, g2) = top5[0][1].split(), top5[1][1].split()
+  (t1, t2), (g1, g2) = map(int, [t1, t2]), map(float, [g1, g2])
+  if t1==t2: 
+    from operator import methodcaller
+    T = list(set([int(i[0]) for i in map(methodcaller("split", " "), phot_dict.keys())]))
+    t1, t2 = min([(abs(j-t1),j) for j in T if j<t1])[1], min([(abs(j-t1),j) for j in T if j>t1])[1]
+  fit_list = []
+  for t in range(sorted([t2,t1])[0],sorted([t2,t1])[1],5)+[max([t1,t2])]:
+    d = modelInterp('{} {}'.format(t,max(g1,g2)), phot_dict, filt_dict=filt_dict)
+    good, const = goodness(photometry, d, filt_dict=filt_dict)
+    fit_list.append([good, '{} {}'.format(t,g1), const, d])
+  
+  top5 = nsmallest(5,[i for i in fit_list if (dist*np.sqrt(i[2])/ac.R_jup).decompose().value<1.4 and (dist*np.sqrt(i[2])/ac.R_jup).decompose().value>0.8] if dist else fit_list) or nsmallest(5,fit_list)
+  printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
+  P, C, D = min(top5)[1:]
+  synW, synF = modelInterp(P, spec_dict)
+  
+  return [[synW, synF*C], D, P, C]
 
+def modelInterp(params, model_dict, filt_dict=None, plot=False):
+  '''
+  Returns the interpolated model atmosphere spectrum (if model_dict==spec_dict) or photometry (if model_dict==phot_dict and filt_dict provided)
+  '''
+  t, g = int(params.split()[0]), params.split()[1]
+  p1, p2 = sorted(zip(*nsmallest(2,[[abs(int(k.split()[0])-t),k] for k in model_dict.keys() if g in k]))[1])
+  t1, t2 = int(p1.split()[0]), int(p2.split()[0])
+  if filt_dict:
+    D = {}
+    for i in filt_dict.keys():
+      try: 
+        D[i] = model_dict[p2][i]+(model_dict[p1][i]-model_dict[p2][i])*(t**4-t2**4)/(t1**4-t2**4)
+        if plot: plt.loglog(filt_dict[i]['eff'], model_dict[p1][i], 'bo', label=p1 if i=='J' else None, alpha=0.7), plt.loglog(filt_dict[i]['eff'], D[i], 'ro', label=params if i=='J' else None, alpha=0.7), plt.loglog(filt_dict[i]['eff'], model_dict[p2][i], 'go', label=p2 if i=='J' else None, alpha=0.7)
+      except KeyError: pass
+    if plot: plt.legend(loc=0), plt.grid(True)
+    return D
+  else:
+    w1, f1, w2, f2 = model_dict[p1]['wavelength'], model_dict[p1]['flux'], model_dict[p2]['wavelength'], model_dict[p2]['flux']
+    if len(f1)!=len(f2): f2 = np.interp(w1, w2, f2, left=0, right=0)
+    F = f2+(f1-f2)*(t**4-t2**4)/(t1**4-t2**4)
+    if plot: plt.loglog(w1, f1, '-b', label=p1, alpha=0.7), plt.loglog(w1, F, '-r', label=params, alpha=0.7), plt.loglog(w1, f2, '-g', label=p2, alpha=0.7), plt.legend(loc=0), plt.grid(True)
+    return [w1,F]
+  
 def modelReplace(spectrum, model, replace=[], Flam=False, tails=False, plot=False):
   '''
   Returns the given *spectrum* with the tuple ranges in *replace* replaced by the given *model*.
@@ -164,7 +224,8 @@ def norm_spec(spectrum, template, exclude=[], include=[]):
   S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
   if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
   if include: S0, T0 = [[i[idx_include(j[0],include)] for i in j] for j in [S0,T0]]
-  norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2]), x=T0[0])                 
+  try: norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2]), x=T0[0])
+  except ValueError: norm = 1            
   S[1] = S[1]*norm                                                                              
   try: S[2] = S[2]*norm                                                        
   except IndexError: pass
@@ -216,7 +277,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
   return normalized[0][:len(template)] if composite else [i[:len(template)] for i in normalized]
 
 def pi2pc(parallax): 
-  if isinstance(parallax,tuple):
+  if isinstance(parallax,(tuple,list)):
     pi, sig_pi = parallax[0]*q.arcsec/1000., parallax[1]*q.arcsec/1000.
     d, sig_d = (1*q.pc*q.arcsec)/pi, sig_pi*q.pc*q.arcsec/pi**2
     return (d, sig_d)
@@ -296,27 +357,13 @@ def smooth(x,beta):
   w = np.kaiser(window_len,beta)
   y = np.convolve(w/w.sum(), s, mode='valid')
   return y[5:len(y)-5]
-
-def specInterp(teff, logg, D, bin=25, Flam=False):
-  greater = min([d for d in D.keys() if (D[d]['Teff'] > teff) and (D[d]['logg'] == logg)])
-  lesser = max([d for d in D.keys() if (D[d]['Teff'] < teff) and (D[d]['logg'] == logg)])
-  Tg, Tl, W, Wl, Fg, Fl = D[greater]['Teff'], D[lesser]['Teff'], D[greater]['W'], D[lesser]['W'], D[greater]['F'], D[lesser]['F']
-  if len(W) != len(Wl): Fl = np.interp(W,Wl,Fl)*q.erg/q.s/q.cm**2 if Flam else np.interp(W,Wl,Fl)*q.erg/q.s/q.cm**3
-  F = Fl + (Fg-Fl)*(float(teff)**4-float(Tl)**4)/(float(Tg)**4-float(Tl)**4)
   
-  # print lesser, greater 
-  # plt.plot(W[::bin],Fg[::bin],color='r',label=greater), plt.plot(W[::bin],Fl[::bin],color='b',label=lesser)
-  # plt.plot(W[::bin],F[::bin],ls='--',color='k',lw=2,label='Weighted Avg')
-  # plt.xscale('log'), plt.yscale('log'), plt.grid(True), plt.legend(loc=0) 
-  
-  return (W[::bin], F[::bin])
-
 def str2Q(x,target=''):
   '''
   Given a string of units unconnected to a number, returns the units as a quantity to be multiplied with the number. 
   Inverse units must be represented by a forward-slash prefix or negative power suffix, e.g. inverse square seconds may be "/s2" or "s-2" 
 
-  *u*
+  *x*
     The units as a string, e.g. str2Q('W/m2/um') => np.array(1.0) * W/(m**2*um)
   *target*
     The target units as a string if rescaling is necessary, e.g. str2Q('Wm-2um-1',target='erg/s/cm2/cm') => np.array(10000000.0) * erg/(cm**3*s)

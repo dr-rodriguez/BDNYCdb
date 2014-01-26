@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, glob, xlrd, cPickle, BDdb, sqlite3 as sql, astropy.io.fits as pf, numpy as np, matplotlib.pyplot as plt, utilities as u, astrotools as a
+import io, os, glob, xlrd, cPickle, BDdb, sqlite3 as sql, astropy.io.fits as pf, astropy.units as q, numpy as np, matplotlib.pyplot as plt, utilities as u, astrotools as a
 path = '/Users/Joe/Documents/Python/'
 db = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/BDNYC.db')
 
@@ -65,7 +65,7 @@ def parallax_data():
       if matches: D[d]['source_id'], D[d]['unum'] = sorted(matches, key=lambda x: u.separation(ra, dec, x[2], x[3]))[0][:2]
   
   print '{} / 259 matches.'.format(len([d for d in D if D[d]['unum']]))
-  return D
+  return D, [d for d in D if not D[d]['unum']]
 
 def coordFix(txt='/Users/Joe/Desktop/matches.txt'):
   import astropy.units as q, astropy.coordinates.angles as A
@@ -291,12 +291,26 @@ def load_log():
 # ==============================================================================================================================================
 
 def load_synthetic_spectra():
-  import os, glob, astropy.units as q
-  from syn_phot import syn_phot as s
   syn, files, bt_settl = BDdb.get_db(path+'Models/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0/*.spec.7'), []
+  syn.query.execute("DROP TABLE IF EXISTS bt_settl"), syn.query.execute("CREATE TABLE bt_settl (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength ARRAY, flux ARRAY, blackbody ARRAY)")    
+  
+  def read_btsettl(filepath):
+    obj, Widx, (T, G) = {}, [], map(float, os.path.splitext(os.path.basename(filepath))[0].replace('lte','').split('-')[:2])
+    T, data = int(T*100), open(filepath, 'r')
+    lines = [i.split()[:3] for i in data]
+    data.close()
+    W, F = [[i[idx] for i in lines[::20]] for idx in [0,1]]
+    W = (np.array([float(w) for w in W])*q.AA).to(q.um)
+    for n,w in enumerate(W):
+      if (w.value <= 0.2) or (w.value >= 40.0): Widx.append(n)                                                     
+    W, F = np.delete(W,Widx)*q.um, np.delete(F,Widx)
+    F, B = ((10**np.array([float(f.replace('D','E')) for f in F]))*q.erg/q.s/q.cm**3).to(q.erg/q.s/q.cm**2/q.AA), u.blackbody(W, T, Flam=False, emitted=True)
+    return {'W':W, 'F':F, 'B':B, 'Teff':T, 'logg':G}
+    
   for f in files:
-    obj = s.read_btsettl(f, Flam=False)
-    bt_settl.append((None, obj['Teff'], obj['logg'], obj['W'].value, obj['F'].value, ((obj['W']*obj['F']).to(q.erg/q.s/q.cm**2)).value, obj['B'].value))
-    print "{} {}".format(obj['Teff'], obj['logg'])
-  syn.query.execute("DROP TABLE IF EXISTS bt_settl"), syn.query.execute("CREATE TABLE bt_settl (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, W ARRAY, F ARRAY, lamF ARRAY, blackbody ARRAY)")    
-  syn.query.executemany("INSERT INTO bt_settl VALUES (?, ?, ?, ?, ?, ?, ?)", bt_settl), syn.modify.commit(), syn.modify.close()
+    obj = read_btsettl(f)
+    try:
+      syn.query.execute("INSERT INTO bt_settl VALUES (?, ?, ?, ?, ?, ?)", (None, obj['Teff'], obj['logg'], obj['W'].value, obj['F'].value, obj['B'].value)), syn.modify.commit()
+      print "{} {}".format(obj['Teff'], obj['logg'])
+    except: print "Failed: {} {}".format(obj['Teff'], obj['logg'])
+  syn.modify.close()    

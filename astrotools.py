@@ -5,14 +5,16 @@ def filter_info(band):
   '''
   (By Joe Filippazzo)
    
-  Effective, min, and max wavelengths in [um] and zeropoint in [erg s-1 cm-2 A-1] and [photon s-1 cm-2 A-1] for SDSS, Johnson UBV, 2MASS, IRAC and WISE filters. Values from SVO filter profile service.
+  Effective, min, and max wavelengths in [um] and zeropoint in [erg s-1 cm-2 A-1] and [photon s-1 cm-2 A-1] for SDSS, Bessel, 2MASS, IRAC and WISE filters. Values from SVO filter profile service.
   
   *band*
       Name of filter band (e.g. 'J' from 2MASS, 'W1' from WISE, etc.) or list of filter systems (e.g. ['SDSS','2MASS','WISE'])
   '''
-  Filters = { 'U':      { 'eff': 0.357065, 'min': 0.303125, 'max': 0.417368, 'zp': 3.698499e-09, 'zp_photon': 6.5743e+02, 'ABtoVega':0, 'ext': 1.56, 'system': 'Johnson' }, 
-              'B':      { 'eff': 0.437812, 'min': 0.363333, 'max': 0.549706, 'zp': 6.180252e-09, 'zp_photon': 1.3786e+03, 'ABtoVega':0, 'ext': 1.31, 'system': 'Johnson' }, 
-              'V':      { 'eff': 0.546611, 'min': 0.473333, 'max': 0.687500, 'zp': 3.521649e-09, 'zp_photon': 9.8165e+02, 'ABtoVega':0, 'ext': 1.02, 'system': 'Johnson' },
+  Filters = { 'U':      { 'eff': 0.357065, 'min': 0.303125, 'max': 0.417368, 'zp': 3.698499e-09, 'zp_photon': 6.5743e+02, 'ABtoVega':0, 'ext': 1.56, 'system': 'Bessel' }, 
+              'B':      { 'eff': 0.437812, 'min': 0.363333, 'max': 0.549706, 'zp': 6.180252e-09, 'zp_photon': 1.3786e+03, 'ABtoVega':0, 'ext': 1.31, 'system': 'Bessel' }, 
+              'V':      { 'eff': 0.544579, 'min': 0.473333, 'max': 0.687500, 'zp': 3.521649e-09, 'zp_photon': 9.8165e+02, 'ABtoVega':0, 'ext': 1.02, 'system': 'Bessel' },
+              'R':      { 'eff': 0.641420, 'min': 0.550435, 'max': 0.883333, 'zp': 1.882309e-09, 'zp_photon': 6.3446e+02, 'ABtoVega':0, 'ext': 0.83, 'system': 'Bessel' },
+              'I':      { 'eff': 0.797880, 'min': 0.704167, 'max': 0.916667, 'zp': 1.132658e-09, 'zp_photon': 4.5495e+02, 'ABtoVega':0, 'ext': 0.61, 'system': 'Bessel' },
               'u':      { 'eff': 0.3543,   'min': 0.304828, 'max': 0.402823, 'zp': 3.652243e-09, 'zp_photon': 6.5486e+02, 'ABtoVega':0.91, 'ext': 1.58, 'system': 'SDSS' },
               'g':      { 'eff': 0.4770,   'min': 0.378254, 'max': 0.554926, 'zp': 5.400197e-09, 'zp_photon': 1.2828e+03, 'ABtoVega':-0.08, 'ext': 1.23, 'system': 'SDSS' },
               'r':      { 'eff': 0.6231,   'min': 0.541534, 'max': 0.698914, 'zp': 2.503279e-09, 'zp_photon': 7.7944e+02, 'ABtoVega':0.16, 'ext': 0.89, 'system': 'SDSS' }, 
