@@ -74,7 +74,7 @@ def read_spec(specFiles, errors=True, atomicron=False, negtonan=False, plot=Fals
     '''
     
     # 1. Convert specFiles into a list type if it is only one file name
-    if isinstance(specFiles, types.StringTypes):
+    if isinstance(specFiles, str):
         specFiles = [specFiles,]
     
     try:

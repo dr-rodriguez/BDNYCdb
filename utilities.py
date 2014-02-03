@@ -3,6 +3,8 @@
 import warnings, glob, os, re, xlrd, cPickle, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a
 from random import random
 from heapq import nsmallest
+from scipy.interpolate import Rbf
+from itertools import chain
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
@@ -35,7 +37,7 @@ def deg2sxg(ra='', dec=''):
   if dec: DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')) 
   return (RA, DEC) if ra and dec else RA or DEC 
   
-def dict2txt(DICT, writefile, column1='-', delim='\t', digits=5, order=''):
+def dict2txt(DICT, writefile, column1='-', delim='\t', digits=None, order=''):
   '''
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
   '''
@@ -46,7 +48,8 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits=5, order=''):
     for k in D.keys():
       w.append(k)
       for i in D[k].keys():
-        D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
+        if digits: D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
+        else: D[k][i] = '-' if not D[k][i] else '{}'.format(D[k][i]) if isinstance(D[k][i],(float,int)) else '{}'.format(float(D[k][i])) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
         w.append(i), w.append(str(D[k][i]))
     width = len(max(map(str,w), key=len))
     head = ['{!s:{}}'.format(column1,width)]
@@ -113,7 +116,7 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
       if filters[i]['system'] not in systems: filters.pop(i)    
     return filters
 
-def goodness(spectrum, model, array=False, filt_dict=None):
+def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
   if isinstance(spectrum,dict) and isinstance(model,dict):
     bands = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])]
     bands = [i for i in bands if all([spectrum[i],model[i]])]
@@ -135,7 +138,7 @@ def idx_exclude(x, exclude):
 
 def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   '''
-  For given band and magnitude, returns the flux value in [ergs][s-1][cm-2][cm-1] or [Jy] if Jy=True
+  For given band and magnitude, returns the flux value in [ergs][s-1][cm-2][cm-1]
   Note: Must be multiplied by wavelength in [cm] to be converted to [ergs][s-1][cm-2], not done here! 
   mag = -2.5*log10(F/zp)  =>  flux = zp*10**(-mag/2.5)
   '''
@@ -144,42 +147,112 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   F = (zp*(filt['eff']*q.um if Flam else 1)*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA))
   E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA)) if unc else 1
   return [F,E] if unc else F 
+  
+def contour_plot(x, y, z):
+  from scipy.interpolate import Rbf
+  from itertools import chain
+  xi, yi = np.meshgrid(np.linspace(min(x), max(x), 500), np.linspace(min(y), max(y), 25))
+  rbf = Rbf(x, y, z, function='linear')
+  zi = rbf(xi, yi)
+  coords = min(zip(*[list(chain.from_iterable(zi)),list(chain.from_iterable(xi)),list(chain.from_iterable(yi))]))[1:]
+  plt.figure(), plt.title('Teff = {}, log(g) = {}'.format(int(coords[0]),coords[1])), plt.contourf(xi, yi, zi, 50), plt.colorbar(), plt.xlim(min(x),max(x)), plt.ylim(min(y),max(y)), plt.xlabel('Teff'), plt.ylabel('log(g)'), plt.plot(*coords, c='white', marker='x')
 
-def modelFit(spectrum, photometry, dist='', exclude=[], spec_dict=None, phot_dict=None, filt_dict=None):
+# def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, r_bounds=(0.5,1.5)):
+#   '''
+#   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
+#   '''
+#   fit_list, phot_fit = [], isinstance(SED,dict)
+#   model_dict = phot_dict if phot_fit else spec_dict
+#   if phot_fit:
+#     for b in SED.keys():
+#       if 'unc' not in b:
+#         if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
+#   for k in model_dict.keys():
+#     if phot_fit:
+#       good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict)
+#       fit_list.append((abs(good), k, float(const), phot_dict[k], (dist*np.sqrt(float(const))/ac.R_jup).decompose().value))
+#     else:
+#       W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
+#       F = smooth(np.interp(SED[0].value, W, F, left=0, right=0),10)*SED[1].unit
+#       good, const = goodness(SED, [W,F], exclude=exclude)
+#       fit_list.append((abs(good), k, float(const), [W,F], (dist*np.sqrt(float(const))/ac.R_jup).decompose().value))
+# 
+#   # reasonable = [i for i in fit_list if i[-1]<r_bounds[1] and i[-1]>r_bounds[0]] if dist else fit_list
+#   # for r in sorted(reasonable): print r[0], r[1], r[2], r[4]
+# 
+#   if plot and not phot_fit:
+#     plt.figure(), plt.loglog(SED[0], SED[1], '-k')
+#     X, Y = plt.xlim(), plt.ylim()
+#     for g,p,c,(w,f),r in sorted(fit_list)[:5]:
+#       plt.loglog(SED[0], f*c, label='{} {}'.format(p,r), alpha=0.5)
+#     plt.xlim(X), plt.ylim(Y), plt.legend(loc=0, frameon=False)
+#   
+#   P, C, D, R = min(fit_list)[1:]
+#   synW, synF = modelInterp(P, spec_dict)
+#     
+#   return [[synW, synF*C], D, P, C]
+  
+def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, Rlim=(0,100), title=''):
   '''
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  fit_list = []
-  for b in photometry.keys():
-    if 'unc' not in b:
-      if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
-  for k in phot_dict.keys():
-    good, const = goodness(photometry, phot_dict[k], filt_dict=filt_dict)
-    fit_list.append((abs(good), k, float(const), phot_dict[k]))
-    # How do I turn a goodness of fit into an uncertainty?
+  fit_list, unfit_list, phot_fit = [], [], isinstance(SED,dict)
+  model_dict = phot_dict if phot_fit else spec_dict
+  if phot_fit:
+    for b in SED.keys():
+      if 'unc' not in b:
+        if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
+  for k in model_dict.keys():
+    if phot_fit:
+      good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict)
+    else:
+      W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
+      F = smooth(np.interp(SED[0].value, W, F, left=0, right=0),10)*SED[1].unit
+      good, const = goodness(SED, [SED[0],F], exclude=exclude)
+    R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
+    if R>Rlim[0] and R<Rlim[1]: fit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [SED[0].value,F]))
+    else: unfit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [SED[0].value,F]))
+  top5 = nsmallest(5,fit_list)
   
-  top5 = nsmallest(5,[i for i in fit_list if (dist*np.sqrt(i[2])/ac.R_jup).decompose().value<1.4 and (dist*np.sqrt(i[2])/ac.R_jup).decompose().value>0.8] if dist else fit_list) or nsmallest(5, fit_list)
+  t1, t2 = min([int(i[1].split()[0]) for i in top5]), max([int(i[1].split()[0]) for i in top5])
+  for g in np.arange(3.0,6.0,0.5):
+    for t in range(sorted([t2,t1])[0],sorted([t2,t1])[1],5)+[max([t1,t2])]:
+      d = modelInterp('{} {}'.format(t,g), model_dict, filt_dict=filt_dict if phot_fit else None)
+      if phot_fit: good, const = goodness(SED, d, filt_dict=filt_dict)
+      else:
+        mW, mF = SED[0], smooth(np.interp(SED[0].value, d[0], d[1], left=0, right=0),10)*SED[1].unit
+        good, const = goodness(SED, [mW,mF], exclude=exclude)
+        R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
+      if R>Rlim[0] and R<Rlim[1]: fit_list.append([good, '{} {}'.format(t,g), const, d])
+      else: unfit_list.append([good, '{} {}'.format(t,g), const, d])
+  
+  top5 = nsmallest(5,fit_list)
   printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
   
-  p1, p2 = phot_dict[top5[0][1]], phot_dict[top5[1][1]]
-  (t1, g1), (t2, g2) = top5[0][1].split(), top5[1][1].split()
-  (t1, t2), (g1, g2) = map(int, [t1, t2]), map(float, [g1, g2])
-  if t1==t2: 
-    from operator import methodcaller
-    T = list(set([int(i[0]) for i in map(methodcaller("split", " "), phot_dict.keys())]))
-    t1, t2 = min([(abs(j-t1),j) for j in T if j<t1])[1], min([(abs(j-t1),j) for j in T if j>t1])[1]
-  fit_list = []
-  for t in range(sorted([t2,t1])[0],sorted([t2,t1])[1],5)+[max([t1,t2])]:
-    d = modelInterp('{} {}'.format(t,max(g1,g2)), phot_dict, filt_dict=filt_dict)
-    good, const = goodness(photometry, d, filt_dict=filt_dict)
-    fit_list.append([good, '{} {}'.format(t,g1), const, d])
+  # if plot:
+  #   goods, params = zip(*fit_list)[:2]
+  #   teffs, loggs = zip(*[map(float,i.split()) for i in params])
+  #   contour_plot(teffs, loggs, goods)
   
-  top5 = nsmallest(5,[i for i in fit_list if (dist*np.sqrt(i[2])/ac.R_jup).decompose().value<1.4 and (dist*np.sqrt(i[2])/ac.R_jup).decompose().value>0.8] if dist else fit_list) or nsmallest(5,fit_list)
-  printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
-  P, C, D = min(top5)[1:]
-  synW, synF = modelInterp(P, spec_dict)
+  if plot and not phot_fit: 
+    from itertools import groupby
+    fig = plt.figure(figsize=(12,8))
+    ax1, ax2 = plt.subplot2grid((1,2), (0,0)), plt.subplot2grid((1,2), (0,1))
+    if exclude:
+      for mn,mx in exclude: ax1.add_patch(plt.Rectangle((mn,1E-20), mx-mn, 1E-10, color='k', alpha=0.1))
+    for key,group in [[k,list(grp)] for k,grp in groupby(sorted(fit_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
+      g, p, c, d = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
+      ax2.plot([int(t.split()[0]) for t in p], g, '-o', color=plt.cm.spectral((5.6-float(key))/2.4,1), label=key)
+    for key,group in [[k,list(grp)] for k,grp in groupby(sorted(unfit_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
+      g, p, c, d = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
+      ax2.plot([int(t.split()[0]) for t in p], g, 'x', ls='none', color=plt.cm.spectral((5.6-float(key))/2.4,1), label=key)
+    ax2.legend(loc=0, ncol=2), ax2.set_xlim(500,3000), ax2.grid(True), ax2.set_ylabel('Goodness of Fit'), ax2.set_xlabel('Teff'), ax2.yaxis.tick_right(), ax2.yaxis.set_label_position('right'), plt.suptitle(plot)
+    for idx,(g,p,c,(w,f)) in enumerate(top5): ax1.loglog(w[::25], smooth(f[::25],10)*c, label='{} / {} / {:.2f}'.format(p.split()[0],p.split()[1],float(dist*np.sqrt(c)) if dist else float(c)), color=plt.cm.spectral((idx+1.)/5.1,1))
+    ax1.loglog(*SED[:2], color='k'), ax1.grid(True), ax1.set_xlabel('Microns'), ax1.set_ylabel('Flux'), ax1.set_xlim(min(SED[0].value)*0.8,max(SED[0].value)*1.2), ax1.set_ylim(min(SED[1].value)*0.8,max(SED[1].value)*1.2), ax1.legend(loc=0)
   
-  return [[synW, synF*C], D, P, C]
+  P, C, D = min(fit_list)[1:]
+  synW, synF = modelInterp(P, spec_dict) if phot_fit else D
+  return [[synW, synF*C], P, C]
 
 def modelInterp(params, model_dict, filt_dict=None, plot=False):
   '''
@@ -288,7 +361,7 @@ def printer(labels, values, format='', to_txt=None):
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
   '''
   print '\r'
-  values = [["None" if not i else "{:.10g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.10g} {}".format(i.value,i.unit) for i in j] for j in values]
+  values = [["None" if not i else "{:.10g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.10g} {}".format(i.value,i.unit) if hasattr(i,'unit') else i for i in j] for j in values]
   auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
   lengths = format if isinstance(format,list) else auto
   col_len = [max(auto) for i in lengths] if format=='max' else [150/len(labels) for i in lengths] if format=='fill' else lengths

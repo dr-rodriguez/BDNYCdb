@@ -74,7 +74,7 @@ class get_db:
     try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, hdu.header)), self.modify.commit()
     except: print "Couldn't add file {} to database.".format(filename)
 
-  def add_fits(self, fitsPath, verbose=False):
+  def add_fits(self, fitsPath, ID=None, verbose=False):
     '''
     Checks the header of the *fitsFile* and inserts it into the database, with source_id if possible.
     '''
@@ -153,11 +153,11 @@ class get_db:
       regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
       try: snr = flx/err if any(flx) and any(err) else None
       except (TypeError,IndexError): snr = None
-      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
-      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, None)), self.modify.commit()
-      if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
+      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, ID or source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
+      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, ID or source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, None)), self.modify.commit()
+      if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, ID or source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
     except: 
-      print [filename, source_id, xunits, yunits, date, instr, scope, airmass, name]
+      print [filename, ID or source_id, xunits, yunits, date, instr, scope, airmass, name]
   
   def clean_up(self, table):
     '''
@@ -166,21 +166,24 @@ class get_db:
     query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1][1:]))  
     self.query.execute(query), self.modify.commit()
   
-  def inventory(self, ID='', with_pi=False, SED=False, plot=True, data=False):
+  def inventory(self, ID='', unum='', with_pi=False, SED=False, plot=True, data=False):
     '''
     Prints a summary of all objects in the database at *dbpath*. If *ID* prints only that object's summary and plots if *plot*
     '''
-    q = "SELECT id, unum, designation, ra, dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources"
-    if ID: q += ' WHERE id={}'.format(ID)
-    elif with_pi and not ID: q = "SELECT s.id, s.unum, s.designation, s.ra, s.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None'"
-    elif SED and not ID: q = "SELECT s.id, s.unum, s.designation, s.ra, s.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=s.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=s.id AND regime='IR') FROM sources AS s JOIN parallaxes AS p ON p.source_id=s.id WHERE p.parallax!='None' AND (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=s.id AND spectra.regime='NIR')>0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=s.id) >0"
+    q = "SELECT sources.id, sources.unum, sources.designation, sources.ra, sources.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources"
+    if ID or unum:
+      if unum: ID = self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(unum)).fetchone()['id']
+      q += ' WHERE id={}'.format(ID)
+    elif with_pi: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None'"
+    elif SED: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None' AND (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR')>0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id) >0" 
     D = self.query.execute(q).fetchall()
     if D:
       u.printer(['id','unum','name','ra','dec','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR'], D)
       if ID and plot:
-        for i in self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id=?", [ID]).fetchall(): 
-          plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.xlim(0.4,3.0), plt.grid(True), plt.yscale('log', nonposy='clip')
-          try: 
+        spectra = self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id={}".format(ID)).fetchall() or self.dict.execute("SELECT wavelength,flux,filename FROM spectra WHERE source_id={}".format(ID)).fetchall()
+        for i in spectra: 
+          plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title(i[2])
+          try:
             Y = plt.ylim()
             plt.fill_between(i[0], i[1]-i[2], i[1]+i[2], alpha=0.2, color='b'), plt.ylim(Y)
           except: pass
@@ -193,6 +196,13 @@ class get_db:
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
     except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
     u.printer(['id','ra','dec','designation','unum','short','names'], self.query.execute(q).fetchall())
+
+  def merge(conflicted, master):
+    pass
+    # Compare conflicted and master for unique data in conflicted.
+    # Print all new/modified records for visual inspection and store in change_log table.
+    # Pull out all unique conflicted records and append them to their respective tables with new ids.
+    # Save database master and move conflicted copy to Resolved Version Histories directory.
 
 # ==============================================================================================================================================
 # ================================= Adapters and converters for special data types =============================================================
