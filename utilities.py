@@ -2,7 +2,7 @@
 # Utilities
 import warnings, glob, os, re, xlrd, cPickle, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a
 from random import random
-from heapq import nsmallest
+from heapq import nsmallest, nlargest
 from scipy.interpolate import Rbf
 from itertools import chain
 warnings.simplefilter('ignore')
@@ -37,13 +37,13 @@ def deg2sxg(ra='', dec=''):
   if dec: DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')) 
   return (RA, DEC) if ra and dec else RA or DEC 
   
-def dict2txt(DICT, writefile, column1='-', delim='\t', digits=None, order=''):
+def dict2txt(DICT, writefile, column1='-', delim='\t', digits=None, order='', append=False):
   '''
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
   '''
   import csv
   D = DICT.copy()
-  with open( writefile, 'w' ) as f:
+  with open( writefile, 'a+' if append else 'w' ) as f:
     writer, w = csv.writer(f, delimiter=delim), []
     for k in D.keys():
       w.append(k)
@@ -122,8 +122,10 @@ def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
     bands = [i for i in bands if all([spectrum[i],model[i]])]
     w, f, sig, weight, F = np.array([filt_dict[i]['eff'] for i in bands]), np.array([spectrum[i] for i in bands]), np.array([spectrum[i+'_unc'] or 0*q.erg/q.s/q.cm**2/q.AA for i in bands]), np.array([filt_dict[i]['max']-filt_dict[i]['min'] for i in bands]), np.array([model[i] for i in bands])
   else:
-    (w, f, sig), (W, F) = spectrum, model
-    weight = np.concatenate([np.array([1]),np.diff(w)])
+    if exclude: spectrum = [i[idx_exclude(spectrum[0].value,exclude)] for i in spectrum]
+    (w, f, sig), F = spectrum, np.interp(spectrum[0].value, model[0], model[1], left=0, right=0)*spectrum[1].unit
+    weight = np.concatenate([np.array([0]),np.diff(w)])
+    if exclude: weight[weight<np.std(weight)] = 0
   C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
   G = weight*((f-F*C)/sig)**2
   return [G if array else sum(G), C]
@@ -191,7 +193,7 @@ def contour_plot(x, y, z):
 #   synW, synF = modelInterp(P, spec_dict)
 #     
 #   return [[synW, synF*C], D, P, C]
-  
+
 def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, Rlim=(0,100), title=''):
   '''
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
@@ -203,30 +205,23 @@ def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plo
       if 'unc' not in b:
         if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
   for k in model_dict.keys():
-    if phot_fit:
-      good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict)
-    else:
-      W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
-      F = smooth(np.interp(SED[0].value, W, F, left=0, right=0),10)*SED[1].unit
-      good, const = goodness(SED, [SED[0],F], exclude=exclude)
+    W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
+    good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict) if phot_fit else goodness(SED, [W,F], exclude=exclude)
     R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
-    if R>Rlim[0] and R<Rlim[1]: fit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [SED[0].value,F]))
-    else: unfit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [SED[0].value,F]))
+    if R>Rlim[0] and R<Rlim[1]: fit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [W,F]))
+    else: unfit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [W,F]))
   top5 = nsmallest(5,fit_list)
   
-  t1, t2 = min([int(i[1].split()[0]) for i in top5]), max([int(i[1].split()[0]) for i in top5])
-  for g in np.arange(3.0,6.0,0.5):
-    for t in range(sorted([t2,t1])[0],sorted([t2,t1])[1],5)+[max([t1,t2])]:
-      d = modelInterp('{} {}'.format(t,g), model_dict, filt_dict=filt_dict if phot_fit else None)
-      if phot_fit: good, const = goodness(SED, d, filt_dict=filt_dict)
-      else:
-        mW, mF = SED[0], smooth(np.interp(SED[0].value, d[0], d[1], left=0, right=0),10)*SED[1].unit
-        good, const = goodness(SED, [mW,mF], exclude=exclude)
-        R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
-      if R>Rlim[0] and R<Rlim[1]: fit_list.append([good, '{} {}'.format(t,g), const, d])
-      else: unfit_list.append([good, '{} {}'.format(t,g), const, d])
-  
-  top5 = nsmallest(5,fit_list)
+  # t1, t2 = min([int(i[1].split()[0]) for i in top5]), max([int(i[1].split()[0]) for i in top5])
+  # for g in np.arange(3.0,6.0,0.5):
+  #   for t in range(sorted([t2,t1])[0],sorted([t2,t1])[1],5)+[max([t1,t2])]:
+  #     d = modelInterp('{} {}'.format(t,g), model_dict, filt_dict=filt_dict if phot_fit else None)
+  #     good, const = goodness(SED, d, filt_dict=filt_dict) if phot_fit else goodness(SED, [d[0],d[1]], exclude=exclude)
+  #     R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
+  #     if R>Rlim[0] and R<Rlim[1]: fit_list.append([good, '{} {}'.format(t,g), const, d])
+  #     else: unfit_list.append([good, '{} {}'.format(t,g), const, d])
+  # 
+  # top5 = nsmallest(5,fit_list)
   printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
   
   # if plot:

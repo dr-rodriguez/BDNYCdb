@@ -172,37 +172,58 @@ class get_db:
     '''
     q = "SELECT sources.id, sources.unum, sources.designation, sources.ra, sources.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR') FROM sources"
     if ID or unum:
-      if unum: ID = self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(unum)).fetchone()['id']
+      if unum: 
+        try: ID = self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(unum)).fetchone()['id']
+        except: print "No sources found with unum {}".format(unum)
       q += ' WHERE id={}'.format(ID)
     elif with_pi: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None'"
     elif SED: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None' AND (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR')>0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id) >0" 
-    D = self.query.execute(q).fetchall()
-    if D:
-      u.printer(['id','unum','name','ra','dec','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR'], D)
-      if ID and plot:
-        spectra = self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id={}".format(ID)).fetchall() or self.dict.execute("SELECT wavelength,flux,filename FROM spectra WHERE source_id={}".format(ID)).fetchall()
-        for i in spectra: 
-          plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title(i[2])
-          try:
-            Y = plt.ylim()
-            plt.fill_between(i[0], i[1]-i[2], i[1]+i[2], alpha=0.2, color='b'), plt.ylim(Y)
-          except: pass
-          try: plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i[3].replace('_',' '),i[4],i[5],i[6]), verticalalignment='top')
-          except: pass
-      if data: return D
-    else: print "No sources found."
+    try:
+      D = self.query.execute(q).fetchall()
+      if D:
+        u.printer(['id','unum','name','ra','dec','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR'], D)
+        if ID and plot:
+          spectra = self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id={}".format(ID)).fetchall() or self.dict.execute("SELECT wavelength,flux,filename FROM spectra WHERE source_id={}".format(ID)).fetchall()
+          for i in spectra: 
+            plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title(i[2])
+            try:
+              Y = plt.ylim()
+              plt.fill_between(i[0], i[1]-i[2], i[1]+i[2], alpha=0.2, color='b'), plt.ylim(Y)
+            except: pass
+            try: plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i[3].replace('_',' '),i[4],i[5],i[6]), verticalalignment='top')
+            except: pass
+        if data: return D
+      else: print "No sources found{}.".format(' with id '+str(ID) if ID else '')
+    except: pass
     
   def identify(self, search):
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
     except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
     u.printer(['id','ra','dec','designation','unum','short','names'], self.query.execute(q).fetchall())
 
-  def merge(conflicted, master):
+  def merge(self, conflicted, master):
     pass
     # Compare conflicted and master for unique data in conflicted.
     # Print all new/modified records for visual inspection and store in change_log table.
     # Pull out all unique conflicted records and append them to their respective tables with new ids.
     # Save database master and move conflicted copy to Resolved Version Histories directory.
+    
+  def output_spectrum(self, spectrum_id, fmt='ascii', filename=None):
+    '''
+    Prints a file of the spectrum with id *spectrum_id* to an *ascii* or *fits* file.
+    '''
+    data = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id)).fetchone()
+    if data:
+      import csv
+      fn, header = '/Users/Joe/Desktop/{}.txt'.format(filename or data['filename']), repr([repr(r) for r in data['header'].ascardlist()])
+      if header:
+        with open(fn, 'w' ) as f:
+          keys, vals, coms = zip(*[eval(l) for l in eval(header)])
+          klen, vlen, clen = [len(max(['1' if isinstance(j,bool) and j else '0' if isinstance(j,bool) else str(j) for j in i], key=len)) for i in [keys,vals,coms]]
+          for k,v,c in zip(keys,vals,coms): csv.writer(f, delimiter='\t').writerow(['# {!s:{}}'.format(k,klen)+'= {!s:{}}'.format(v,vlen)+' / {!s:{}}'.format(c,clen)])
+          csv.writer(f, delimiter='\t').writerow([' '])
+      u.dict2txt({str(w):{'flux [{}]'.format(data['flux_units']):str(f), 'unc [{}]'.format(data['flux_units']):str(e)} for w,f,e in zip(data['wavelength'],data['flux'],data['unc'])}, fn, column1='# wavelength [{}]'.format(data['wavelength_units']), append=True)
+    else: print "No spectrum found with id {}".format(spectrum_id)
 
 # ==============================================================================================================================================
 # ================================= Adapters and converters for special data types =============================================================
