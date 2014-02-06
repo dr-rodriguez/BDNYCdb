@@ -57,7 +57,7 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits=None, order='', ap
     for i in headorder: head.append('{!s:{}}'.format(i,width))
     if delim == ',': head = [i.replace(' ','') for i in head]
     writer.writerow(head)
-    for i in D.keys():
+    for i in sorted(D.keys()):
       order = order or sorted(D[i].keys())
       row = ['{!s:{}}'.format(i,width)]
       for k in order:
@@ -132,11 +132,15 @@ def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
 
 def idx_include(x, include):
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
-  except TypeError: return range(len(x))
+  except TypeError:
+    try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in [include]])))))[0] 
+    except TypeError: return range(len(x))
 
 def idx_exclude(x, exclude):
   try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
-  except TypeError: return range(len(x))
+  except TypeError: 
+    try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
+    except TypeError: return range(len(x))
 
 def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   '''
