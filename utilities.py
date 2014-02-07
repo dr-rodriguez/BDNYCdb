@@ -208,6 +208,8 @@ def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plo
     for b in SED.keys():
       if 'unc' not in b:
         if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
+    if all([b in SED for b in ['W3','W3_unc','W4','W4_unc']]):
+      if SED['W4']>SED['W3']: SED.pop('W4'), SED.pop('W4_unc')
   for k in model_dict.keys():
     W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
     good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict) if phot_fit else goodness(SED, [W,F], exclude=exclude)
