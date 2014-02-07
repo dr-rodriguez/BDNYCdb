@@ -37,8 +37,9 @@ class get_db:
     try:
       self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_unit, flux_unit, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
-    except: print "Couldn't add spectrum to database."
-    
+    except: 
+    	print "Couldn't add spectrum to database."
+    	print wavelength_order
   def add_BDSS_ascii(self, asciiPath, snrPath=''):
     '''
     Given the path to an ascii data file *asciiPath* with filename format NAME_ORDER.DATE inserts spectrum into the database. If *snrPath* is provided, generates uncertainty and inserts both arrays.
