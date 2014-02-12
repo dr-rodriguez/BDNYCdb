@@ -35,7 +35,7 @@ class get_db:
       header = hdu.header
     except: header = ''
     try:
-      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id or unum2id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_unit, flux_unit, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
     except: print "Couldn't add spectrum to database."
     
@@ -74,130 +74,93 @@ class get_db:
     try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, hdu.header)), self.modify.commit()
     except: print "Couldn't add file {} to database.".format(filename)
 
-  def add_fits(self, fitsPath, ID=None, verbose=False):
+  def add_fits(self, fitsPath, source_id='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''):
     '''
     Checks the header of the *fitsFile* and inserts it into the database, with source_id if possible.
     '''
-    filename, header, lookup, unum = os.path.basename(fitsPath), pf.getheader(fitsPath), u.txt2dict(path+'Spectra/unum_lookup.txt', to_list=True), None
-    
-    # RA and DEC (This is rejecting too many files! Why same RA and DEC for different files, e.g. see Terminal?)
-    try: RA, DEC = header['RA'], header['DEC']
-    except KeyError: RA, DEC = '', ''
-    try:
-      ra = RA if isinstance(RA,float) else float(RA) if RA.replace('+','').replace('-','').replace('.','').isdigit() else u.sxg2deg(ra=RA)
-      dec = DEC if isinstance(DEC,float) else float(DEC) if DEC.replace('+','').replace('-','').replace('.','').isdigit() else u.sxg2deg(dec=DEC)
-    except ValueError:
-      print "{}: {} {}".format(filename,RA,DEC)
-      ra, dec = '', ''
+    filename, header = os.path.basename(fitsPath), pf.getheader(fitsPath)
 
     # x- and y-units
-    try:
-      xunits = header['XUNITS'] 
-      if 'microns' in xunits or 'Microns' in xunits or 'um' in xunits: xunits = 'um'
-    except KeyError:
+    if not wavelength_units:
       try:
-         if header['BUNIT']: xunits = 'um'
-      except KeyError: xunits = ''
-    try: yunits = header['YUNITS'].replace(' ','')
-    except KeyError:
-      try: yunits = header['BUNIT'].replace(' ','')
-      except KeyError: yunits = ''
-    if 'erg' in yunits and 'A' in yunits: yunits = 'ergs-1cm-2A-1'
-    elif 'erg' in yunits and 'um' in yunits: yunits = 'ergs-1cm-2um-1'
-    elif 'W' in yunits and 'um' in yunits: yunits = 'Wm-2um-1'
-    elif 'W' in yunits and 'A' in yunits: yunits = 'Wm-2A-1'
+        wavelength_units = header['XUNITS'] 
+        if 'microns' in wavelength_units or 'Microns' in wavelength_units or 'um' in wavelength_units: wavelength_units = 'um'
+      except KeyError:
+        try:
+           if header['BUNIT']: wavelength_units = 'um'
+        except KeyError: wavelength_units = ''
+    if not flux_units:
+      try: flux_units = header['YUNITS'].replace(' ','')
+      except KeyError:
+        try: flux_units = header['BUNIT'].replace(' ','')
+        except KeyError: flux_units = ''
+    if 'erg' in flux_units and 'A' in flux_units: flux_units = 'ergs-1cm-2A-1' if 'erg' in flux_units and 'A' in flux_units else 'ergs-1cm-2um-1' if 'erg' in flux_units and 'um' in flux_units else 'Wm-2um-1' if 'W' in flux_units and 'um' in flux_units else 'Wm-2A-1' if 'W' in flux_units and 'A' in flux_units else ''
 
     # Date, object name, telescope and instrument
-    try: date = header['DATE_OBS']
-    except KeyError:
-      try: date = header['DATE-OBS']
-      except KeyError: date = ''
-    try: obj = header['OBJECT']
-    except KeyError: obj = ''
-    try:
-      n = header['TELESCOP'].lower()
-      scope = 5 if 'hst' in n else 6 if 'spitzer' in n else 7 if 'irtf' in n else 9 if 'keck' in n and 'ii' in n else 8 if 'keck' in n and 'i' in n else 10 if 'kp' in n and '4' in n else 11 if 'kp' in n and '2' in n else 12 if 'bok' in n else 13 if 'mmt' in n else 14 if 'ctio' in n and '1' in n else 15 if 'ctio' in n and '4' in n else 16 if 'gemini' in n and 'north' in n else 17 if 'gemini' in n and 'south' in n else 18 if 'vlt' in n else 19 if '3.5m' in n else 20 if 'subaru' in n else 0
-    except KeyError: scope = ''
-    try: 
-      i = header['INSTRUME'].lower()
-      instr = 1 if 'r-c spec' in i or 'test' in i or 'nod' in i else 2 if 'gmos-n' in i else 3 if 'gmos-s' in i else 4 if 'fors' in i else 5 if 'lris' in i else 6 if 'spex' in i else 7 if 'ldss3' in i else 8 if 'focas' in i else 9 if 'nirspec' in i else 0
-    except KeyError: instr = ''
+    if not obs_date:
+      try: obs_date = header['DATE_OBS']
+      except KeyError:
+        try: obs_date = header['DATE-OBS']
+        except KeyError: date = ''
+    if not telescope_id:
+      try:
+        n = header['TELESCOP'].lower()
+        telescope_id = 5 if 'hst' in n else 6 if 'spitzer' in n else 7 if 'irtf' in n else 9 if 'keck' in n and 'ii' in n else 8 if 'keck' in n and 'i' in n else 10 if 'kp' in n and '4' in n else 11 if 'kp' in n and '2' in n else 12 if 'bok' in n else 13 if 'mmt' in n else 14 if 'ctio' in n and '1' in n else 15 if 'ctio' in n and '4' in n else 16 if 'gemini' in n and 'north' in n else 17 if 'gemini' in n and 'south' in n else 18 if 'vlt' in n else 19 if '3.5m' in n else 20 if 'subaru' in n else 0
+      except KeyError: telescope_id = ''
+    if not instrument_id:
+      try: 
+        i = header['INSTRUME'].lower()
+        instrument_id = 1 if 'r-c spec' in i or 'test' in i or 'nod' in i else 2 if 'gmos-n' in i else 3 if 'gmos-s' in i else 4 if 'fors' in i else 5 if 'lris' in i else 6 if 'spex' in i else 7 if 'ldss3' in i else 8 if 'focas' in i else 9 if 'nirspec' in i else 0
+      except KeyError: instrument_id = ''
     try: airmass = header['AIRMASS']
     except: airmass = 0
-    try: name = old_db[unum]['name']
-    except: name = ''
-    pub_id, wav_order = '', ''
     
-    unum = has_unum(filename) or has_unum(name) or has_unum(obj)
-    for U,fn in lookup:
-      if filename == fn: unum = U
-    
-    if unum:
-      try: source_id = {str(k):j for j,k in [tuple(i) for i in self.query.execute("SELECT id,unum FROM sources")]}[unum]
-      except KeyError: 
-        try:
-          self.query.execute("INSERT INTO sources VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, ra, dec, None, None, None, unum, None, None)), self.modify.commit()
-          q = "SELECT * FROM sources WHERE unum='{}'".format(unum)
-          source_id = self.dict.execute(q).fetchone()['id']
-        except: source_id = None
-    else:
-      q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '%{0}%' OR designation LIKE '%{0}%'".format(filename.replace('.fits',''))
-      result = self.query.execute(q).fetchall()
-      if result:
-        if len(result)>1: print name, shortname, unum, result
-        else: source_id, unum = result[0]
-      else: source_id = unum = ''
-
     try:
       wav, flx, err = u.unc(a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0])
       regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
       try: snr = flx/err if any(flx) and any(err) else None
       except (TypeError,IndexError): snr = None
-      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, ID or source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, header)), self.modify.commit()
-      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, ID or source_id, wav, xunits, flx, yunits, err, snr, wav_order, regime, pub_id, date, instr, scope, airmass, filename, name, None)), self.modify.commit()
-      if verbose: u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, ID or source_id, xunits, yunits, regime, date, instr, scope, airmass, name]])
+      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
+      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, None)), self.modify.commit()
+      u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, wavelength_units, flux_units, regime, obs_date, instrument_id, telescope_id, airmass, comment]])
     except: 
-      print [filename, ID or source_id, xunits, yunits, date, instr, scope, airmass, name]
+      print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, airmass, comment]
   
   def clean_up(self, table):
     '''
     Removes exact duplicates from the specified *table* keeping the record with the lowest id.
     '''
     # First pass to delete only exact duplicates, i.e every column value is identical.
-    query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1][1:]))  
+    columns = zip(*self.query.execute("PRAGMA table_info(spectra)").fetchall())[1]
+    query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns))  
     self.query.execute(query), self.modify.commit()
     
     # Second pass to delete duplicate spectra if the flux arrays are identical, choosing the record with the greatest number of column values
     if table=='spectra':
-      query = "DELETE FROM spectra WHERE id NOT IN (SELECT max(id) FROM spectra GROUP BY flux)"
-      self.query.execute(query), self.modify.commit()      
+      # score = "SELECT (CASE WHEN {}".format(' IS NOT null THEN 1 ELSE 0 END) + (CASE WHEN '.join(columns))+" IS NOT null THEN 1 ELSE 0 END),id FROM spectra"      
+      self.query.execute("DELETE FROM spectra WHERE id NOT IN (SELECT max(id) FROM spectra GROUP BY flux)"), self.modify.commit()      
       
-  def inventory(self, ID='', unum='', with_pi=False, SED=False, plot=True, data=False):
+  def inventory(self, ID='', unum='', with_pi=False, SED=False, plot=False, data=False):
     '''
-    Prints a summary of all objects in the database at *dbpath*. If *ID* prints only that object's summary and plots if *plot*
+    Prints a summary of all objects in the database. Input string or list of strings in *ID* or *unum* for specific objects.
     '''
     q = "SELECT sources.id, sources.unum, sources.designation, sources.ra, sources.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR'), (SELECT gravity from spectral_types WHERE spectral_types.source_id=sources.id) FROM sources"
     if ID or unum:
       if unum: 
-        try: ID = self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(unum)).fetchone()['id']
-        except: print "No sources found with unum {}".format(unum)
-      q += ' WHERE id={}'.format(ID)
+        unums = unum if isinstance(unum,list) else [unum]
+        IDS = zip(*self.dict.execute("SELECT * FROM sources WHERE unum IN ({})".format("'"+"','".join(unums)+"'")).fetchall())[0]
+      else: IDS = ID if isinstance(ID,list) else [ID]  
+      q += ' WHERE id IN ({})'.format("'"+"','".join(map(str,IDS))+"'")
     elif with_pi: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None'"
     elif SED: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None' AND (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR')>0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id) >0" 
     try:
       D = self.query.execute(q).fetchall()
       if D:
         u.printer(['id','unum','name','ra','dec','Spec Count','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR','grav'], D)
-        if ID and plot:
-          spectra = self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id={}".format(ID)).fetchall() or self.dict.execute("SELECT wavelength,flux,filename FROM spectra WHERE source_id={}".format(ID)).fetchall()
-          for i in spectra: 
-            plt.figure(), plt.loglog(i[0], i[1], c='b'), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title(i[2])
-            try:
-              Y = plt.ylim()
-              plt.fill_between(i[0], i[1]-i[2], i[1]+i[2], alpha=0.2, color='b'), plt.ylim(Y)
-            except: pass
-            try: plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i[3].replace('_',' '),i[4],i[5],i[6]), verticalalignment='top')
-            except: pass
+        if plot:
+          for I in ID:
+            spectra = self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date,s.source_id FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id={}".format(I)).fetchall() or self.dict.execute("SELECT wavelength,flux,filename FROM spectra WHERE source_id={}".format(I)).fetchall()
+            for i in spectra: plt.figure(), plt.rc('text', usetex=False, fontsize=12), plt.loglog(i[0], i[1], c='b'), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title('source_id = {}'.format(i[7])), plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i[3].replace('_',' '),i[4],i[5],i[6]), verticalalignment='top')
         if data: return D
       else: print "No sources found{}.".format(' with id '+str(ID) if ID else '')
     except: pass

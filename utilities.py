@@ -96,7 +96,7 @@ def find(filename, tree):
 
   return result
 
-def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','HST','Bessel']], systems=['2MASS','SDSS','WISE','IRAC','HST','Bessel']):
+def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','HST','Bessel','MKO']], systems=['2MASS','SDSS','WISE','IRAC','HST','Bessel','MKO']):
   '''
   Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1]. 
   '''
