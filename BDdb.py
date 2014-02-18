@@ -24,21 +24,25 @@ class get_db:
     u.printer(fields,insert), self.query.executemany(query, insert), self.modify.commit()
     print "{} records added to the {} table.".format(len(data),table.upper())
    
-  def add_ascii(self, asciiPath, header_chars=['#'], skip=[], start=0, source_id='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''): 
+  def add_ascii(self, asciiPath, snrPath='', header_chars=['#'], skip=[], start=0, source_id='', unum='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''): 
     filename, data = os.path.basename(asciiPath), zip(*u.txt2dict(asciiPath, to_list=True, skip=header_chars+skip))
-    wavelength, flux, unc = [np.array(i, dtype='float32') for i in data][start:start+3]
-    snr, regime = flux/unc, 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
+    wavelength, flux = [np.array(i, dtype='float32') for i in data][start:start+2]
+    try:
+      snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[1][1:], dtype='float32') if snrPath else ''
+      unc = flx/snr if snrPath else np.array(data[2], dtype='float32')
+    except: snr = unc = ''
+    regime = 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
     try:
       hdu, h = pf.PrimaryHDU(), [i for i in pf.open(asciiPath) if any([i.startswith(char) for char in header_chars])]
       hdu.header.append(('COMMENT',' '.join([' '.join(i) for n,i in enumerate(h) if any([h[n][0].startswith(char) for char in header_chars])]),''))
       header = hdu.header
     except: header = ''
     try:
-      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id or unum2id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
-      u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_unit, flux_unit, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
-    except: 
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id or self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(source_id)).fetchone()['id'] if unum else '', wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
+      u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
+    except IOError: 
     	print "Couldn't add spectrum to database."
-    	print wavelength_order
+
   def add_BDSS_ascii(self, asciiPath, snrPath=''):
     '''
     Given the path to an ascii data file *asciiPath* with filename format NAME_ORDER.DATE inserts spectrum into the database. If *snrPath* is provided, generates uncertainty and inserts both arrays.
@@ -158,7 +162,7 @@ class get_db:
       if D:
         u.printer(['id','unum','name','ra','dec','Spec Count','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR','grav'], D)
         if plot:
-          for I in ID:
+          for I in IDS:
             spectra = self.dict.execute("SELECT s.wavelength,s.flux,s.unc,s.filename,t.name,i.name,s.obs_date,s.source_id FROM spectra AS s JOIN telescopes AS t JOIN instruments as i ON s.instrument_id=i.id AND s.telescope_id=t.id WHERE s.source_id={}".format(I)).fetchall() or self.dict.execute("SELECT wavelength,flux,filename FROM spectra WHERE source_id={}".format(I)).fetchall()
             for i in spectra: plt.figure(), plt.rc('text', usetex=False, fontsize=12), plt.loglog(i[0], i[1], c='b'), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title('source_id = {}'.format(i[7])), plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i[3].replace('_',' '),i[4],i[5],i[6]), verticalalignment='top')
         if data: return D

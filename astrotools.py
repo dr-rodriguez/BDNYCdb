@@ -51,7 +51,7 @@ def filter_info(band):
   elif isinstance(band,str):
     return Filters[band]
 
-def read_spec(specFiles, errors=True, atomicron=False, negtonan=False, plot=False, linear=False, verbose=True):
+def read_spec(specFiles, errors=True, atomicron=False, negtonan=False, plot=False, linear=False, wlog=False, verbose=True):
     '''
     (by Alejandro N |uacute| |ntilde| ez, Jocelyn Ferrara)
     
@@ -155,9 +155,7 @@ def read_spec(specFiles, errors=True, atomicron=False, negtonan=False, plot=Fals
         
             # Generate wl axis when needed
             if specData[spFileIdx][0] is None:
-                specData[spFileIdx][0] = __create_waxis(fitsHeader, \
-                                         len(specData[spFileIdx][1]), spFile, \
-                                         verb=verbose)
+                specData[spFileIdx][0] = __create_waxis(fitsHeader, len(specData[spFileIdx][1]), spFile, wlog=wlog, verb=verbose)
             # If no wl axis generated, then clear out all retrieved data for object
             if specData[spFileIdx][0] is None:
                 specData[spFileIdx] = None
@@ -212,7 +210,7 @@ def specType(SpT):
   else:
     return SpT
  
-def __create_waxis(fitsHeader, lenData, fileName, verb=True):
+def __create_waxis(fitsHeader, lenData, fileName, verb=True, wlog=False):
     # Define key names in
     KEY_MIN  = ['COEFF0','CRVAL1']         # Min wl
     KEY_DELT = ['COEFF1','CDELT1','CD1_1'] # Delta of wl
@@ -238,7 +236,7 @@ def __create_waxis(fitsHeader, lenData, fileName, verb=True):
             valOff  = fitsHeader[nameOff]
         
         # generate wl axis
-        if nameMin == 'COEFF0':
+        if nameMin == 'COEFF0' or wlog==True:
             # SDSS fits files
             wAxis = 10 ** (np.arange(lenData) * valDelt + valMin)
         else:

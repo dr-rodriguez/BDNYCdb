@@ -154,14 +154,16 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA)) if unc else 1
   return [F,E] if unc else F 
   
-def contour_plot(x, y, z):
+def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet):
   from scipy.interpolate import Rbf
   from itertools import chain
   xi, yi = np.meshgrid(np.linspace(min(x), max(x), 500), np.linspace(min(y), max(y), 25))
   rbf = Rbf(x, y, z, function='linear')
   zi = rbf(xi, yi)
-  coords = min(zip(*[list(chain.from_iterable(zi)),list(chain.from_iterable(xi)),list(chain.from_iterable(yi))]))[1:]
-  plt.figure(), plt.title('Teff = {}, log(g) = {}'.format(int(coords[0]),coords[1])), plt.contourf(xi, yi, zi, 50), plt.colorbar(), plt.xlim(min(x),max(x)), plt.ylim(min(y),max(y)), plt.xlabel('Teff'), plt.ylabel('log(g)'), plt.plot(*coords, c='white', marker='x')
+  plt.figure(figsize=figsize), plt.contourf(xi, yi, zi, levels, cmap=cmap), plt.colorbar(), plt.xlim(min(x),max(x)), plt.ylim(min(y),max(y)), plt.xlabel('Teff'), plt.ylabel('log(g)')
+  if best:
+    coords = min(zip(*[list(chain.from_iterable(zi)),list(chain.from_iterable(xi)),list(chain.from_iterable(yi))]))[1:]
+    plt.title('Teff = {}, log(g) = {}'.format(*coords)), plt.plot(*coords, c='white', marker='x')
 
 # def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, r_bounds=(0.5,1.5)):
 #   '''
@@ -327,17 +329,19 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
   if composite:
     for w,f,e in normalized:
       IDX, idx = np.where(np.logical_and(W<w[-1],W>w[0]))[0], np.where(np.logical_and(w>W[0],w<W[-1]))[0]
-      (W0, F0, E0), (w0, f0, e0) = [i[IDX] for i in [W,F,E]], [i[idx] for i in [w,f,e]]
-      f0, e0 = np.interp(W0, w0, f0), np.interp(W0, w0, e0)
-      if exclude:
-        Eidx = idx_include(W0,exclude)
-        keep, E0[Eidx] = E0[Eidx], 1E-30
-      f_mean = np.array([np.average([fl,FL], weights=[1/er,1/ER]) for fl,er,FL,ER in zip(f0,e0,F0,E0)])
-      if exclude: E0[Eidx] = keep
-      e_mean = np.sqrt(e0**2 + E0**2)
-      spec1, spec2 = min([W,F,E], [w,f,e], key=lambda x: x[0][0]), max([W,F,E], [w,f,e], key=lambda x: x[0][-1])
-      spec1, spec2 = [i[np.where(spec1[0]<W0[0])[0]] for i in spec1], [i[np.where(spec2[0]>W0[-1])[0]] for i in spec2]
-      W, F, E = [np.concatenate([i,j,k]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
+      if not any(IDX): normalized.append([w,f,e])
+      else:
+        (W0, F0, E0), (w0, f0, e0) = [i[IDX] for i in [W,F,E]], [i[idx] for i in [w,f,e]]
+        f0, e0 = np.interp(W0, w0, f0), np.interp(W0, w0, e0)
+        if exclude:
+          Eidx = idx_include(W0,exclude)
+          keep, E0[Eidx] = E0[Eidx], 1E-30
+        f_mean = np.array([np.average([fl,FL], weights=[1/er,1/ER]) for fl,er,FL,ER in zip(f0,e0,F0,E0)])
+        if exclude: E0[Eidx] = keep
+        e_mean = np.sqrt(e0**2 + E0**2)
+        spec1, spec2 = min([W,F,E], [w,f,e], key=lambda x: x[0][0]), max([W,F,E], [w,f,e], key=lambda x: x[0][-1])
+        spec1, spec2 = [i[np.where(spec1[0]<W0[0])[0]] for i in spec1], [i[np.where(spec2[0]>W0[-1])[0]] for i in spec2]
+        W, F, E = [np.concatenate([i,j,k]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
 
     if replace: W, F, E = modelReplace([W,F,E], replace=replace, D_Flam=D_Flam)
 
