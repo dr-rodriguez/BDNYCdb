@@ -38,9 +38,9 @@ class get_db:
       header = hdu.header
     except: header = ''
     try:
-      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id or self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(source_id)).fetchone()['id'] if unum else '', wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id or self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(unum)).fetchone()['id'] if unum else '', wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
-    except IOError: 
+    except: 
     	print "Couldn't add spectrum to database."
 
   def add_BDSS_ascii(self, asciiPath, snrPath=''):
@@ -127,15 +127,14 @@ class get_db:
       try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, None)), self.modify.commit()
       u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, wavelength_units, flux_units, regime, obs_date, instrument_id, telescope_id, airmass, comment]])
-    except: 
-      print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, airmass, comment]
+    except: print "Couldn't add fits file {}".format(fitsPath); print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, airmass, comment]
   
   def clean_up(self, table):
     '''
     Removes exact duplicates from the specified *table* keeping the record with the lowest id.
     '''
     # First pass to delete only exact duplicates, i.e every column value is identical.
-    columns = zip(*self.query.execute("PRAGMA table_info(spectra)").fetchall())[1]
+    columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
     query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns))  
     self.query.execute(query), self.modify.commit()
     
@@ -174,12 +173,19 @@ class get_db:
     except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
     u.printer(['id','ra','dec','designation','unum','short','names'], self.query.execute(q).fetchall())
 
-  def merge(self, conflicted, master):
-    pass
-    # Compare conflicted and master for unique data in conflicted.
-    # Print all new/modified records for visual inspection and store in change_log table.
-    # Pull out all unique conflicted records and append them to their respective tables with new ids.
-    # Save database master and move conflicted copy to Resolved Version Histories directory.
+  def merge(self, conflicted, delete=False):
+    M = get_db(conflicted)
+    for table in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1]:
+      columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
+      data = map(list,M.query.execute("SELECT * FROM {}".format(table)).fetchall())
+      for i in data: i[0] = None
+      self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for i in columns])), data)
+      self.modify.commit()      
+      self.query.execute("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:]))), self.modify.commit()
+    
+      # Print out similar records and prompt to delete possible duplicates.
+    
+    if delete: os.remove(conflicted)
     
   def output_spectrum(self, spectrum_id, fmt='ascii', filename=None):
     '''
