@@ -1,15 +1,17 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools as a
+import io, os, itertools, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools as a
 
 class get_db:
   def __init__(self, dbpath):
-    con = sql.connect(dbpath, isolation_level=None, detect_types=sql.PARSE_DECLTYPES)
-    con.text_factory = str
-    self.modify = con
-    self.query = con.cursor()
-    self.dict = con.cursor()
-    self.dict.row_factory = sql.Row
+    if os.path.isfile(dbpath):
+      con = sql.connect(dbpath, isolation_level=None, detect_types=sql.PARSE_DECLTYPES)
+      con.text_factory = str
+      self.modify = con
+      self.query = con.cursor()
+      self.dict = con.cursor()
+      self.dict.row_factory = sql.Row
+    else: print "Sorry, no such file '{}'".format(dbpath)
         
   def add_data(self, CSV, table):
     '''
@@ -23,6 +25,8 @@ class get_db:
       insert.append(tuple(values))
     u.printer(fields,insert), self.query.executemany(query, insert), self.modify.commit()
     print "{} records added to the {} table.".format(len(data),table.upper())
+    
+    # Include functionality similar to merge() where identifies possible duplicates and prompts to delete them.
    
   def add_ascii(self, asciiPath, snrPath='', header_chars=['#'], skip=[], start=0, source_id='', unum='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''): 
     filename, data = os.path.basename(asciiPath), zip(*u.txt2dict(asciiPath, to_list=True, skip=header_chars+skip))
@@ -173,19 +177,43 @@ class get_db:
     except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
     u.printer(['id','ra','dec','designation','unum','short','names'], self.query.execute(q).fetchall())
 
-  def merge(self, conflicted, delete=False):
-    M = get_db(conflicted)
-    for table in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1]:
-      columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
-      data = map(list,M.query.execute("SELECT * FROM {}".format(table)).fetchall())
-      for i in data: i[0] = None
-      self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for i in columns])), data)
-      self.modify.commit()      
-      self.query.execute("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:]))), self.modify.commit()
+  def merge(self, conflicted):
+    if os.path.isfile(conflicted):
+      con, master = get_db(conflicted), self.query.execute("PRAGMA database_list").fetchall()[0][2]
+      con.query.execute("ATTACH DATABASE '{}' AS m".format(master)), self.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), con.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), self.query.execute("ATTACH DATABASE '{}' AS m".format(master))
+            
+      for table in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1]:
+        columns, records = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1], self.query.execute("SELECT Count(*) FROM {}".format(table)).fetchone()[0]
+        data = map(list, con.query.execute("SELECT * FROM (SELECT 1 AS db, {0} FROM m.{1} UNION ALL SELECT 2 AS db, {0} FROM c.{1}) GROUP BY {0} HAVING COUNT(*)=1 AND db=2".format(','.join(columns[1:]),table)).fetchall())
+
+        if data:
+          print "Merging table {}".format(table.upper())
+          for i in data: i[0] = None
+          self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for c in columns])), data), self.modify.commit()
+          print "{} records added to {}:".format(len(data), master)
+          u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15)
     
-      # Print out similar records and prompt to delete possible duplicates.
-    
-    if delete: os.remove(conflicted)
+          # Print out similar records and prompt to delete possible duplicates.
+          dups = list(set([item for sublist in [[i[:len(i)/2],i[len(i)/2:]] for i in self.query.execute("SELECT t1.*, t2.* FROM {0} t1 JOIN {0} t2 ON {1} WHERE ({2}) BETWEEN 2 AND {3} AND t1.{4}!=t2.{4}".format(table, ' OR '.join(['t1.{0}=t2.{0}'.format(c) for c in columns[1:]]), '+'.join(["(CASE WHEN t1.{0}=t2.{0} AND t1.{0} IS NOT NULL AND t1.{0} NOT IN ('None','null','NaN','') THEN 1 ELSE 0 END)".format(c) for c in columns[1:]]),len(columns[1:]),columns[0])).fetchall()] for item in sublist]))
+          if dups:
+            dups = [[repr(i) if isinstance(i, np.ndarray) else i for i in d] for d in dups]
+            print '\nPossible duplicates in {} table '.format(table.upper())+'='*(125-len(table))
+            u.printer(columns, dups, truncate=15)
+            if table=='sources': print "Resolve any issues for the SOURCES table using the SQLite Database Browser."
+            else:
+              delete = raw_input("Record ids to delete? [Press *Enter* for none] : ")
+              if delete:
+                delete = map(int, delete.split(','))
+                for ID in delete:
+                  if ID in map(int, [i[0] for i in dups]):
+                    sure = raw_input('Are you sure you want to delete record {}? [y/n] : '.format(ID))
+                    if sure.lower()=='y':                  
+                      try: self.query.execute("DELETE FROM {} WHERE {}={}".format(table,columns[0],ID)), self.modify.commit()
+                      except IOError: print 'Could not delete record {}'.format(ID)
+                  else: print "Id {} not in list of duplicates, bro.".format(ID)
+        else: print "{} table identical.".format(table.upper())
+      con.query.execute("DETACH DATABASE c"), self.query.execute("DETACH DATABASE c"), con.query.execute("DETACH DATABASE m"), self.query.execute("DETACH DATABASE m"), con.modify.close()
+    else: print "File '{}' not found!".format(conflicted)
     
   def output_spectrum(self, spectrum_id, fmt='ascii', filename=None):
     '''

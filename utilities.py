@@ -118,9 +118,12 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
 
 def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
   if isinstance(spectrum,dict) and isinstance(model,dict):
+    from syn_phot import syn_phot as s
     bands = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])]
     bands = [i for i in bands if all([spectrum[i],model[i]])]
-    w, f, sig, weight, F = np.array([filt_dict[i]['eff'] for i in bands]), np.array([spectrum[i] for i in bands]), np.array([spectrum[i+'_unc'] or 0*q.erg/q.s/q.cm**2/q.AA for i in bands]), np.array([filt_dict[i]['max']-filt_dict[i]['min'] for i in bands]), np.array([model[i] for i in bands])
+    w, f, sig, F = np.array([filt_dict[i]['eff'] for i in bands]), np.array([spectrum[i] for i in bands]), np.array([spectrum[i+'_unc'] or 0*q.erg/q.s/q.cm**2/q.AA for i in bands]), np.array([model[i] for i in bands])
+    # weight = f
+    weight = np.array([filt_dict[i]['max']-filt_dict[i]['min'] for i in bands])
   else:
     if exclude: spectrum = [i[idx_exclude(spectrum[0].value,exclude)] for i in spectrum]
     (w, f, sig), F = spectrum, np.interp(spectrum[0].value, model[0], model[1], left=0, right=0)*spectrum[1].unit
@@ -165,41 +168,6 @@ def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet)
     coords = min(zip(*[list(chain.from_iterable(zi)),list(chain.from_iterable(xi)),list(chain.from_iterable(yi))]))[1:]
     plt.title('Teff = {}, log(g) = {}'.format(*coords)), plt.plot(*coords, c='white', marker='x')
 
-# def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, r_bounds=(0.5,1.5)):
-#   '''
-#   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
-#   '''
-#   fit_list, phot_fit = [], isinstance(SED,dict)
-#   model_dict = phot_dict if phot_fit else spec_dict
-#   if phot_fit:
-#     for b in SED.keys():
-#       if 'unc' not in b:
-#         if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
-#   for k in model_dict.keys():
-#     if phot_fit:
-#       good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict)
-#       fit_list.append((abs(good), k, float(const), phot_dict[k], (dist*np.sqrt(float(const))/ac.R_jup).decompose().value))
-#     else:
-#       W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
-#       F = smooth(np.interp(SED[0].value, W, F, left=0, right=0),10)*SED[1].unit
-#       good, const = goodness(SED, [W,F], exclude=exclude)
-#       fit_list.append((abs(good), k, float(const), [W,F], (dist*np.sqrt(float(const))/ac.R_jup).decompose().value))
-# 
-#   # reasonable = [i for i in fit_list if i[-1]<r_bounds[1] and i[-1]>r_bounds[0]] if dist else fit_list
-#   # for r in sorted(reasonable): print r[0], r[1], r[2], r[4]
-# 
-#   if plot and not phot_fit:
-#     plt.figure(), plt.loglog(SED[0], SED[1], '-k')
-#     X, Y = plt.xlim(), plt.ylim()
-#     for g,p,c,(w,f),r in sorted(fit_list)[:5]:
-#       plt.loglog(SED[0], f*c, label='{} {}'.format(p,r), alpha=0.5)
-#     plt.xlim(X), plt.ylim(Y), plt.legend(loc=0, frameon=False)
-#   
-#   P, C, D, R = min(fit_list)[1:]
-#   synW, synF = modelInterp(P, spec_dict)
-#     
-#   return [[synW, synF*C], D, P, C]
-
 def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, Rlim=(0,100), title=''):
   '''
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
@@ -211,6 +179,7 @@ def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plo
       if 'unc' not in b:
         if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
     if all([b in SED for b in ['W3','W3_unc','W4','W4_unc']]):
+      # If infrared excess, drop W4 since the models won't fit
       if SED['W4']>SED['W3']: SED.pop('W4'), SED.pop('W4_unc')
   for k in model_dict.keys():
     W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
@@ -231,11 +200,6 @@ def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plo
   # 
   # top5 = nsmallest(5,fit_list)
   printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
-  
-  # if plot:
-  #   goods, params = zip(*fit_list)[:2]
-  #   teffs, loggs = zip(*[map(float,i.split()) for i in params])
-  #   contour_plot(teffs, loggs, goods)
   
   if plot and not phot_fit: 
     from itertools import groupby
@@ -361,24 +325,24 @@ def pi2pc(parallax):
     return (d, sig_d)
   else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
 
-def printer(labels, values, format='', to_txt=None):
+def printer(labels, values, format='', truncate=100, to_txt=None):
   '''
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
   '''
   print '\r'
   values = [["None" if not i else "{:.10g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.10g} {}".format(i.value,i.unit) if hasattr(i,'unit') else i for i in j] for j in values]
   auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
-  lengths = format if isinstance(format,list) else auto
+  lengths = format if isinstance(format,list) else [min(truncate,i) for i in auto]
   col_len = [max(auto) for i in lengths] if format=='max' else [150/len(labels) for i in lengths] if format=='fill' else lengths
   for l,m in zip(labels,col_len):
-    print str(l).ljust(m),
-    if to_txt: txtFile.write(str(l).replace(' ','').ljust(m))
+    print str(l)[:truncate].ljust(m),
+    if to_txt: txtFile.write(str(l)[:truncate].replace(' ','').ljust(m))
   for v in values:
     print '\n',
     if to_txt: txtFile.write('\n') 
     for k,j in zip(v,col_len):
-      print str(k).ljust(j),
-      if to_txt: txtFile.write(str(k).replace(' ','').ljust(j))
+      print str(k)[:truncate].ljust(j),
+      if to_txt: txtFile.write(str(k)[:truncate].replace(' ','').ljust(j))
   print '\n'
 
 def rgb_image(images, save=''):

@@ -291,8 +291,8 @@ def load_log():
 # ==============================================================================================================================================
 
 def load_synthetic_spectra():
-  syn, files, bt_settl = BDdb.get_db(path+'Models/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0/*.spec.7'), []
-  syn.query.execute("DROP TABLE IF EXISTS bt_settl"), syn.query.execute("CREATE TABLE bt_settl (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength ARRAY, flux ARRAY, blackbody ARRAY)")    
+  syn, files, bt_settl = BDdb.get_db(path+'Models/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0_2013/*.BT-Settl.20'), []
+  syn.query.execute("DROP TABLE IF EXISTS bt_settl_2013"), syn.query.execute("CREATE TABLE bt_settl_2013 (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength ARRAY, flux ARRAY, blackbody ARRAY)")    
   
   def read_btsettl(filepath):
     obj, Widx, (T, G) = {}, [], map(float, os.path.splitext(os.path.basename(filepath))[0].replace('lte','').split('-')[:2])
@@ -310,7 +310,7 @@ def load_synthetic_spectra():
   for f in files:
     obj = read_btsettl(f)
     try:
-      syn.query.execute("INSERT INTO bt_settl VALUES (?, ?, ?, ?, ?, ?)", (None, obj['Teff'], obj['logg'], obj['W'].value, obj['F'].value, obj['B'].value)), syn.modify.commit()
+      syn.query.execute("INSERT INTO bt_settl_2013 VALUES (?, ?, ?, ?, ?, ?)", (None, obj['Teff'], obj['logg'], obj['W'].value, obj['F'].value, obj['B'].value)), syn.modify.commit()
       print "{} {}".format(obj['Teff'], obj['logg'])
     except: print "Failed: {} {}".format(obj['Teff'], obj['logg'])
   syn.modify.close()    
