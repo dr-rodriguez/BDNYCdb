@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, glob, xlrd, cPickle, BDdb, sqlite3 as sql, astropy.io.fits as pf, astropy.units as q, numpy as np, matplotlib.pyplot as plt, utilities as u, astrotools as a
+import io, os, glob, xlrd, cPickle, BDdb, sqlite3 as sql, astropy.io.fits as pf, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, utilities as u, astrotools as a
 path = '/Users/Joe/Documents/Python/'
 db = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/BDNYC.db')
 
@@ -290,9 +290,26 @@ def load_log():
 # ================================= Synthetic Spectra Database (separate from BDNYC.db database) ===============================================
 # ==============================================================================================================================================
 
-def load_synthetic_spectra():
-  syn, files, bt_settl = BDdb.get_db(path+'Models/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0_2013/*.BT-Settl.20'), []
-  syn.query.execute("DROP TABLE IF EXISTS bt_settl_2013"), syn.query.execute("CREATE TABLE bt_settl_2013 (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength ARRAY, flux ARRAY, blackbody ARRAY)")    
+def load_marley_spectra():
+  syn, files, models = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/model_atmospheres.db'), glob.glob(path+'Models/Marley Models/sp_t*'), []
+  syn.query.execute("DROP TABLE IF EXISTS marley_saumon"), syn.query.execute("CREATE TABLE marley_saumon (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, f_sed INTEGER, k_zz REAL, wavelength ARRAY, flux ARRAY)")    
+
+  def read_model(filepath):
+    fn = os.path.splitext(os.path.basename(filepath))[0][4:]
+    t, f, g, kzz = int(fn.split('g')[0]), 2 if 'f' in fn else None, round(np.log10(int(fn.split('g')[1].split('nc')[0].split('f')[0])*100),1), float(fn.split('kzz')[1]) if 'kzz' in fn else None
+    W, F = zip(*u.txt2dict(filepath, to_list=True, start=2))
+    W = np.array(map(float, W), dtype='float32')*q.um
+    return [W[::-1], (np.array(map(float, F), dtype='float32')*q.erg/q.s/q.cm**2/q.Hz*(ac.c/W**2)).to(q.erg/q.s/q.cm**2/q.AA)[::-1], t, f, g, kzz]
+  
+  for f in files:
+    W, F, t, f, g, kzz = read_model(f)
+    syn.query.execute("INSERT INTO marley_saumon VALUES (?, ?, ?, ?, ?, ?, ?)", (None, t, g, f, kzz, W.value, F.value)), syn.modify.commit()
+    print "{} {} {} {}".format(t, g, f, kzz)
+  syn.modify.close()
+
+def load_bt_settl_spectra(year=2013):
+  syn, files, bt_settl = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0_{}/*.spec.7'.format(year)), []
+  syn.query.execute("DROP TABLE IF EXISTS bt_settl_{}".format(year)), syn.query.execute("CREATE TABLE bt_settl_{} (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength ARRAY, flux ARRAY)".format(year))    
   
   def read_btsettl(filepath):
     obj, Widx, (T, G) = {}, [], map(float, os.path.splitext(os.path.basename(filepath))[0].replace('lte','').split('-')[:2])
@@ -304,13 +321,12 @@ def load_synthetic_spectra():
     for n,w in enumerate(W):
       if (w.value <= 0.2) or (w.value >= 40.0): Widx.append(n)                                                     
     W, F = np.delete(W,Widx)*q.um, np.delete(F,Widx)
-    F, B = ((10**np.array([float(f.replace('D','E')) for f in F]))*q.erg/q.s/q.cm**3).to(q.erg/q.s/q.cm**2/q.AA), u.blackbody(W, T, Flam=False, emitted=True)
-    return {'W':W, 'F':F, 'B':B, 'Teff':T, 'logg':G}
+    return [T, G, W, ((10**np.array([float(f.replace('D','E')) for f in F]))*q.erg/q.s/q.cm**3).to(q.erg/q.s/q.cm**2/q.AA)]
     
   for f in files:
     obj = read_btsettl(f)
     try:
-      syn.query.execute("INSERT INTO bt_settl_2013 VALUES (?, ?, ?, ?, ?, ?)", (None, obj['Teff'], obj['logg'], obj['W'].value, obj['F'].value, obj['B'].value)), syn.modify.commit()
-      print "{} {}".format(obj['Teff'], obj['logg'])
-    except: print "Failed: {} {}".format(obj['Teff'], obj['logg'])
+      syn.query.execute("INSERT INTO bt_settl_{} VALUES (?, ?, ?, ?, ?)".format(year), (None, obj[0], obj[1], obj[2].value, obj[3].value)), syn.modify.commit()
+      print "{} {}".format(obj[0], obj[1])
+    except IOError: print "Failed: {} {}".format(obj[0], obj[1])
   syn.modify.close()    

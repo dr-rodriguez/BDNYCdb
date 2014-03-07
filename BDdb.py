@@ -16,17 +16,28 @@ class get_db:
   def add_data(self, CSV, table):
     '''
     Adds data in *CSV* file to the specified database *table*. Note column names (row 1 of CSV file) must match table fields to insert though order and completeness don't matter.
-    '''
-    data, fields, insert = u.txt2dict(CSV, all_str=True, delim=',', to_list=True), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1], []
-    columns, query = data.pop(0), "INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(fields)))
+    '''    
+    data, (fields, types) = u.txt2dict(CSV, all_str=True, delim=',', to_list=True), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3]
+    columns, insert, update = data.pop(0), [], []
     for row in data:
       values = [None for i in fields]
-      for field in fields: values[fields.index(field)] = row[columns.index(field)] if field in columns and field!='id' else None
-      insert.append(tuple(values))
-    u.printer(fields,insert), self.query.executemany(query, insert), self.modify.commit()
-    print "{} records added to the {} table.".format(len(data),table.upper())
+      for field in fields: values[fields.index(field)] = row[columns.index(field)] if field in columns and row[columns.index(field)] else None
+      update.append(tuple(values)) if values[fields.index('id')] else insert.append(tuple(values))
+    u.printer(fields,insert)
+    if insert:
+      self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(fields))), insert), self.modify.commit()
+      print "{} new records added to the {} table.".format(len(insert),table.upper())
+    if update:
+      for item in update:
+        record = self.query.execute("SELECT * FROM {} WHERE id={}".format(table, item[fields.index('id')])).fetchone()
+        if any([str(i)!=str(r) for i,r in zip(item,record)]):
+          u.printer(['']+list(fields), [['CURRENT']+list(record),['NEW_REC']+list(item)])
+          replace = raw_input("Replace [r], complete [c], or keep [Press *Enter*] current record? : ")
+          if replace.lower()=='r': self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ", ".join(["=".join([i,"'"+str(j)+"'" if j and t in ['TEXT','ARRAY'] else j if j and t in ['INTEGER','NUMERIC'] else 'NULL']) for i,j,t in zip(fields,item,types)]), item[fields.index('id')]))
+          elif replace.lower()=='c': self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ", ".join(["=".join([i,"'"+str(j)+"'" if j and t in ['TEXT','ARRAY'] else j if j and t in ['INTEGER','NUMERIC'] else None]) for i,j,t,r in zip(fields,item,types,record) if i and not r]), item[fields.index('id')]))
+          else: pass
     
-    # Include functionality similar to merge() where identifies possible duplicates and prompts to delete them.
+    self.clean_up(table)
    
   def add_ascii(self, asciiPath, snrPath='', header_chars=['#'], skip=[], start=0, source_id='', unum='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''): 
     filename, data = os.path.basename(asciiPath), zip(*u.txt2dict(asciiPath, to_list=True, skip=header_chars+skip))
@@ -41,9 +52,11 @@ class get_db:
       hdu.header.append(('COMMENT',' '.join([' '.join(i) for n,i in enumerate(h) if any([h[n][0].startswith(char) for char in header_chars])]),''))
       header = hdu.header
     except: header = ''
+    if not source_id and unum: source_id = self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(unum)).fetchone()['id']
     try:
-      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id or self.dict.execute("SELECT * FROM sources WHERE unum='{}'".format(unum)).fetchone()['id'] if unum else '', wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
+      self.clean_up('spectra')
     except: 
     	print "Couldn't add spectrum to database."
 
@@ -131,21 +144,42 @@ class get_db:
       try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, None)), self.modify.commit()
       u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, wavelength_units, flux_units, regime, obs_date, instrument_id, telescope_id, airmass, comment]])
+      self.clean_up('spectra')
     except: print "Couldn't add fits file {}".format(fitsPath); print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, airmass, comment]
   
   def clean_up(self, table):
     '''
-    Removes exact duplicates from the specified *table* keeping the record with the lowest id.
+    Removes exact duplicates from the specified *table* keeping the record with the lowest id. Then find duplicates and prompt for conflict resolution.
     '''
-    # First pass to delete only exact duplicates, i.e every column value is identical.
     columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
-    query = "DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns))  
-    self.query.execute(query), self.modify.commit()
+    self.query.execute("DELETE FROM {0} WHERE {1}".format(table, ' IS NULL AND '.join(columns[1:])+' IS NULL'))
+    self.query.execute("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:]))), self.modify.commit()
     
-    # Second pass to delete duplicate spectra if the flux arrays are identical, choosing the record with the greatest number of column values
-    if table=='spectra':
-      # score = "SELECT (CASE WHEN {}".format(' IS NOT null THEN 1 ELSE 0 END) + (CASE WHEN '.join(columns))+" IS NOT null THEN 1 ELSE 0 END),id FROM spectra"      
-      self.query.execute("DELETE FROM spectra WHERE id NOT IN (SELECT max(id) FROM spectra GROUP BY flux)"), self.modify.commit()      
+    # Print out similar records and prompt to delete possible duplicates.
+    dups = list(set([item for sublist in [[i[:len(i)/2],i[len(i)/2:]] for i in self.query.execute("SELECT t1.*, t2.* FROM {0} t1 JOIN {0} t2 ON {1} WHERE ({2}) BETWEEN 2 AND {3} AND t1.{4}!=t2.{4}".format(table, ' OR '.join(['t1.{0}=t2.{0}'.format(c) for c in columns[1:]]), '+'.join(["(CASE WHEN t1.{0}=t2.{0} AND t1.{0} IS NOT NULL AND t1.{0} NOT IN ('None','null','NaN','') THEN 1 ELSE 0 END)".format(c) for c in columns[1:]]),len(columns[1:]),columns[0])).fetchall()] for item in sublist]))
+    if dups:
+      dups = [[repr(i) if isinstance(i, np.ndarray) else i for i in d] for d in dups]
+      print '\nPossible duplicates in {} table '.format(table.upper())+'='*(125-len(table))
+      u.printer(columns, dups, truncate=15)
+      if table=='sources': print "Resolve any issues for the SOURCES table using the SQLite Database Browser."
+      else:
+        delete = raw_input("Record ids to delete? [Press *Enter* for none] : ")
+        if delete:
+          if all([i.isdigit() for i in delete]):
+            delete = map(int, delete.split(','))
+            for ID in delete:
+              if ID in map(int, [i[0] for i in dups]):
+                sure = raw_input('Are you sure you want to delete record {}? [y/n] : '.format(ID))
+                if sure.lower()=='y':                  
+                  try: self.query.execute("DELETE FROM {} WHERE {}={}".format(table,columns[0],ID)), self.modify.commit()
+                  except IOError: print 'Could not delete record {}'.format(ID)
+              else: print "Id {} not in list of duplicates, bro.".format(ID)
+          else: print 'Just comma separated integers, please! No records deleted.'
+  
+  def identify(self, search):
+    try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
+    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
+    u.printer(['id','ra','dec','designation','unum','short','names'], self.query.execute(q).fetchall()) 
       
   def inventory(self, ID='', unum='', with_pi=False, SED=False, plot=False, data=False):
     '''
@@ -171,11 +205,6 @@ class get_db:
         if data: return D
       else: print "No sources found{}.".format(' with id '+str(ID) if ID else '')
     except: pass
-    
-  def identify(self, search):
-    try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
-    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
-    u.printer(['id','ra','dec','designation','unum','short','names'], self.query.execute(q).fetchall())
 
   def merge(self, conflicted):
     if os.path.isfile(conflicted):
@@ -192,26 +221,9 @@ class get_db:
           self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for c in columns])), data), self.modify.commit()
           print "{} records added to {}:".format(len(data), master)
           u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15)
-    
-          # Print out similar records and prompt to delete possible duplicates.
-          dups = list(set([item for sublist in [[i[:len(i)/2],i[len(i)/2:]] for i in self.query.execute("SELECT t1.*, t2.* FROM {0} t1 JOIN {0} t2 ON {1} WHERE ({2}) BETWEEN 2 AND {3} AND t1.{4}!=t2.{4}".format(table, ' OR '.join(['t1.{0}=t2.{0}'.format(c) for c in columns[1:]]), '+'.join(["(CASE WHEN t1.{0}=t2.{0} AND t1.{0} IS NOT NULL AND t1.{0} NOT IN ('None','null','NaN','') THEN 1 ELSE 0 END)".format(c) for c in columns[1:]]),len(columns[1:]),columns[0])).fetchall()] for item in sublist]))
-          if dups:
-            dups = [[repr(i) if isinstance(i, np.ndarray) else i for i in d] for d in dups]
-            print '\nPossible duplicates in {} table '.format(table.upper())+'='*(125-len(table))
-            u.printer(columns, dups, truncate=15)
-            if table=='sources': print "Resolve any issues for the SOURCES table using the SQLite Database Browser."
-            else:
-              delete = raw_input("Record ids to delete? [Press *Enter* for none] : ")
-              if delete:
-                delete = map(int, delete.split(','))
-                for ID in delete:
-                  if ID in map(int, [i[0] for i in dups]):
-                    sure = raw_input('Are you sure you want to delete record {}? [y/n] : '.format(ID))
-                    if sure.lower()=='y':                  
-                      try: self.query.execute("DELETE FROM {} WHERE {}={}".format(table,columns[0],ID)), self.modify.commit()
-                      except IOError: print 'Could not delete record {}'.format(ID)
-                  else: print "Id {} not in list of duplicates, bro.".format(ID)
+          self.clean_up(table)
         else: print "{} table identical.".format(table.upper())
+      
       con.query.execute("DETACH DATABASE c"), self.query.execute("DETACH DATABASE c"), con.query.execute("DETACH DATABASE m"), self.query.execute("DETACH DATABASE m"), con.modify.close()
     else: print "File '{}' not found!".format(conflicted)
     

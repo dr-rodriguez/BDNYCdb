@@ -117,20 +117,19 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
     return filters
 
 def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
-  if isinstance(spectrum,dict) and isinstance(model,dict):
-    from syn_phot import syn_phot as s
-    bands = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])]
-    bands = [i for i in bands if all([spectrum[i],model[i]])]
-    w, f, sig, F = np.array([filt_dict[i]['eff'] for i in bands]), np.array([spectrum[i] for i in bands]), np.array([spectrum[i+'_unc'] or 0*q.erg/q.s/q.cm**2/q.AA for i in bands]), np.array([model[i] for i in bands])
-    # weight = f
-    weight = np.array([filt_dict[i]['max']-filt_dict[i]['min'] for i in bands])
+  if isinstance(spectrum,dict) and isinstance(model,dict) and filt_dict:
+    bands, w, f, sig, F, weight = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])], [], [], [], [], []
+    for eff,b in sorted([(filt_dict[i]['eff'],i) for i in bands]):
+      if spectrum[b] and spectrum[b+'_unc'] and model[b]: w.append(eff), f.append(spectrum[b]), sig.append(spectrum[b+'_unc']), F.append(model[b]), weight.append(filt_dict[b]['max']-filt_dict[b]['min'])
+    w, f, sig, F, weight = map(np.array, [w, f, sig, F, weight])
   else:
     if exclude: spectrum = [i[idx_exclude(spectrum[0].value,exclude)] for i in spectrum]
     (w, f, sig), F = spectrum, np.interp(spectrum[0].value, model[0], model[1], left=0, right=0)*spectrum[1].unit
     weight = np.concatenate([np.array([0]),np.diff(w)])
     if exclude: weight[weight<np.std(weight)] = 0
+  # C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
   C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
-  G = weight*((f-F*C)/sig)**2
+  G = ((f-F*C)/sig)**2
   return [G if array else sum(G), C]
 
 def idx_include(x, include):
@@ -218,7 +217,7 @@ def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plo
     ax1.loglog(*SED[:2], color='k'), ax1.grid(True), ax1.set_xlabel('Microns'), ax1.set_ylabel('Flux'), ax1.set_xlim(min(SED[0].value)*0.8,max(SED[0].value)*1.2), ax1.set_ylim(min(SED[1].value)*0.8,max(SED[1].value)*1.2), ax1.legend(loc=0)
   
   P, C, D = min(fit_list)[1:]
-  synW, synF = modelInterp(P, spec_dict) if phot_fit else D
+  synW, synF = ([spec_dict[P]['wavelength'], spec_dict[P]['flux']] if P in spec_dict.keys() else modelInterp(P, spec_dict)) if phot_fit else D
   return [[synW, synF*C], P, C]
 
 def modelInterp(params, model_dict, filt_dict=None, plot=False):
@@ -248,7 +247,7 @@ def modelReplace(spectrum, model, replace=[], Flam=False, tails=False, plot=Fals
   '''
   Returns the given *spectrum* with the tuple ranges in *replace* replaced by the given *model*.
   '''
-  if tails: replace += [(0.1,spectrum[0][0].value),(spectrum[0][-1].value,22)]
+  if tails: replace += [(0.1,spectrum[0][0].value),(spectrum[0][-1].value,100)]
   fW, fF, fE = [i[idx_include(model[0].value,replace)] for i in [model[0].value, model[1].value, model[1].value]]
   W, F, E = [i[idx_exclude(spectrum[0].value,replace)] for i in spectrum]
   W, F, E = map(np.array,zip(*sorted(zip(*[np.concatenate(i) for i in [[W.value,fW],[F.value,fF],[E.value,fE]]]), key=lambda x: x[0])))
@@ -277,7 +276,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
   Returns one normalized, composite spectrum if *composite*, else returns the list of *spectra* normalized to the *template*.
   '''    
   if not template: 
-    spectra = sorted(spectra, key=lambda x: x[1][-1])
+    spectra = [unc(i, SNR=SNR) for i in sorted(spectra, key=lambda x: x[1][-1])]
     template = spectra.pop()
                                                                                     
   if trim:
@@ -285,8 +284,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
     for n,x1,x2 in trim: all_spec[n] = [i[idx_exclude(all_spec[n][0],[(x1,x2)])] for i in all_spec[n]]
     template, spectra = all_spec[0], all_spec[1:]
   
-  # (W, F, E), normalized = [i.value if hasattr(i,'_unit') else i for i in unc(template, SNR=SNR)], []
-  (W, F, E), normalized = unc(template, SNR=SNR), []
+  (W, F, E), normalized = template, []
   for S in spectra: normalized.append(norm_spec([i.value if hasattr(i,'_unit') else i for i in unc(S, SNR=SNR)], [W,F,E], exclude=exclude+replace))
   if plot: plt.loglog(W, F, alpha=0.5), plt.fill_between(W, F-E, F+E, alpha=0.1)
     
@@ -398,7 +396,7 @@ def smooth(x,beta):
   s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
   w = np.kaiser(window_len,beta)
   y = np.convolve(w/w.sum(), s, mode='valid')
-  return y[5:len(y)-5]
+  return y[5:len(y)-5]*(x.unit if hasattr(x, 'unit') else 1)
   
 def str2Q(x,target=''):
   '''
@@ -413,10 +411,8 @@ def str2Q(x,target=''):
   if x:       
     def Q(IN):
       OUT = 1
-      text = ['erg', '/s', 's-1', 's', '/um', 'um-1', 'um', '/cm2', 'cm-2', 'cm2', '/cm', 'cm-1', 'cm', \
-              '/A', 'A-1', 'A', 'W', '/m2', 'm-2', 'm2', '/m', 'm-1', 'm', '/Hz', 'Hz-1']
-      vals = [q.erg, q.s**-1, q.s**-1, q.s, q.um**-1, q.um**-1, q.um, q.cm**-2, q.cm**-2, q.cm**2, q.cm**-1, q.cm**-1, q.cm, 
-              q.AA**-1, q.AA**-1, q.AA, q.W, q.m**-2, q.m**-2, q.m**2, q.m**-1, q.m**-1, q.m, q.Hz**-1, q.Hz**-1]
+      text = ['erg', '/s', 's-1', 's', '/um', 'um-1', 'um', '/cm2', 'cm-2', 'cm2', '/cm', 'cm-1', 'cm', '/A', 'A-1', 'A', 'W', '/m2', 'm-2', 'm2', '/m', 'm-1', 'm', '/Hz', 'Hz-1']
+      vals = [q.erg, q.s**-1, q.s**-1, q.s, q.um**-1, q.um**-1, q.um, q.cm**-2, q.cm**-2, q.cm**2, q.cm**-1, q.cm**-1, q.cm, q.AA**-1, q.AA**-1, q.AA, q.W, q.m**-2, q.m**-2, q.m**2, q.m**-1, q.m**-1, q.m, q.Hz**-1, q.Hz**-1]
       for t,v in zip(text,vals):
         if t in IN:
           OUT = OUT*v
@@ -425,11 +421,11 @@ def str2Q(x,target=''):
 
     unit = Q(x)
     if target:
-      q = str(Q(target)).split()[-1]
+      z = str(Q(target)).split()[-1]
       try:
-        unit = unit.to(q)
+        unit = unit.to(z)
       except ValueError:
-        print "{} could not be rescaled to {}".format(unit,q)
+        print "{} could not be rescaled to {}".format(unit,z)
 
     return unit 
   else:
