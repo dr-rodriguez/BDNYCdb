@@ -23,18 +23,18 @@ class get_db:
       values = [None for i in fields]
       for field in fields: values[fields.index(field)] = row[columns.index(field)] if field in columns and row[columns.index(field)] else None
       update.append(tuple(values)) if values[fields.index('id')] else insert.append(tuple(values))
-    u.printer(fields,insert)
     if insert:
+      u.printer(fields, insert, truncate=15)
       self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(fields))), insert), self.modify.commit()
       print "{} new records added to the {} table.".format(len(insert),table.upper())
     if update:
       for item in update:
         record = self.query.execute("SELECT * FROM {} WHERE id={}".format(table, item[fields.index('id')])).fetchone()
-        if any([str(i)!=str(r) for i,r in zip(item,record)]):
-          u.printer(['']+list(fields), [['CURRENT']+list(record),['NEW_REC']+list(item)])
+        if any([str(i)!=str(r) and t!='ARRAY' and r and not i for i,r,t in zip(item,record,types)]):
+          u.printer(['']+list([d for d,t in zip(fields,types) if t!='ARRAY']), [['CURRENT']+list([d for d,t in zip(record,types) if t!='ARRAY']),['NEW_REC']+list([d for d,t in zip(item,types) if t!='ARRAY'])], truncate=15)
           replace = raw_input("Replace [r], complete [c], or keep [Press *Enter*] current record? : ")
-          if replace.lower()=='r': self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ", ".join(["=".join([i,"'"+str(j)+"'" if j and t in ['TEXT','ARRAY'] else j if j and t in ['INTEGER','NUMERIC'] else 'NULL']) for i,j,t in zip(fields,item,types)]), item[fields.index('id')]))
-          elif replace.lower()=='c': self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ", ".join(["=".join([i,"'"+str(j)+"'" if j and t in ['TEXT','ARRAY'] else j if j and t in ['INTEGER','NUMERIC'] else None]) for i,j,t,r in zip(fields,item,types,record) if i and not r]), item[fields.index('id')]))
+          if replace.lower()=='r': self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ", ".join(["=".join([i,"'"+str(j)+"'" if j and t=='TEXT' else j if j and t in ['INTEGER','NUMERIC'] else 'NULL']) for i,j,t in zip(fields,item,types) if t!='ARRAY']), item[fields.index('id')])), self.modify.commit()
+          elif replace.lower()=='c' and any([i and not r for i,r in zip(item,record)]): self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ", ".join(["=".join([i,"'"+str(j)+"'" if t=='TEXT' else str(j) if t in ['INTEGER','NUMERIC'] else 'NULL']) for i,j,t,r in zip(fields,item,types,record) if t!='ARRAY' and j and not r]), item[fields.index('id')])), self.modify.commit()
           else: pass
     
     self.clean_up(table)
@@ -82,7 +82,7 @@ class get_db:
       if filename == fn: unum = U
     
     if unum:
-      try: source_id = {str(k):j for j,k in [tuple(i) for i in self.query.execute("SELECT id, unum FROM sources")]}[unum]
+      try: source_id = {str(k):j for j,k in [tuple(i) for i in self.query.execute("SELECT id, unum FROM sources").fetchall()]}[unum]
       except KeyError: pass
     else:
       q = "SELECT id, unum FROM sources WHERE names LIKE '%{0}%' OR shortname LIKE '%{0}%' OR designation LIKE '%{0}%'".format(filename.replace('_ascii_hc','').replace('.dat',''))
@@ -122,7 +122,9 @@ class get_db:
       try: obs_date = header['DATE_OBS']
       except KeyError:
         try: obs_date = header['DATE-OBS']
-        except KeyError: date = ''
+        except KeyError:
+          try: obs_date = header['DATE']
+          except KeyError: obs_date = ''
     if not telescope_id:
       try:
         n = header['TELESCOP'].lower()
@@ -152,29 +154,30 @@ class get_db:
     Removes exact duplicates from the specified *table* keeping the record with the lowest id. Then find duplicates and prompt for conflict resolution.
     '''
     columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
-    self.query.execute("DELETE FROM {0} WHERE {1}".format(table, ' IS NULL AND '.join(columns[1:])+' IS NULL'))
+    self.query.execute("DELETE FROM {0} WHERE {1}".format(table, column[1]+' IS NULL' if len(columns)==2 else (' IS NULL AND '.join(columns[1:])+' IS NULL')))
     self.query.execute("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:]))), self.modify.commit()
     
-    # Print out similar records and prompt to delete possible duplicates.
-    dups = list(set([item for sublist in [[i[:len(i)/2],i[len(i)/2:]] for i in self.query.execute("SELECT t1.*, t2.* FROM {0} t1 JOIN {0} t2 ON {1} WHERE ({2}) BETWEEN 2 AND {3} AND t1.{4}!=t2.{4}".format(table, ' OR '.join(['t1.{0}=t2.{0}'.format(c) for c in columns[1:]]), '+'.join(["(CASE WHEN t1.{0}=t2.{0} AND t1.{0} IS NOT NULL AND t1.{0} NOT IN ('None','null','NaN','') THEN 1 ELSE 0 END)".format(c) for c in columns[1:]]),len(columns[1:]),columns[0])).fetchall()] for item in sublist]))
-    if dups:
-      dups = [[repr(i) if isinstance(i, np.ndarray) else i for i in d] for d in dups]
-      print '\nPossible duplicates in {} table '.format(table.upper())+'='*(125-len(table))
-      u.printer(columns, dups, truncate=15)
-      if table=='sources': print "Resolve any issues for the SOURCES table using the SQLite Database Browser."
-      else:
-        delete = raw_input("Record ids to delete? [Press *Enter* for none] : ")
-        if delete:
-          if all([i.isdigit() for i in delete]):
-            delete = map(int, delete.split(','))
-            for ID in delete:
-              if ID in map(int, [i[0] for i in dups]):
-                sure = raw_input('Are you sure you want to delete record {}? [y/n] : '.format(ID))
-                if sure.lower()=='y':                  
-                  try: self.query.execute("DELETE FROM {} WHERE {}={}".format(table,columns[0],ID)), self.modify.commit()
-                  except IOError: print 'Could not delete record {}'.format(ID)
-              else: print "Id {} not in list of duplicates, bro.".format(ID)
-          else: print 'Just comma separated integers, please! No records deleted.'
+    if table!='spectra': # Until I fix this SQL query!
+      # Print out similar records and prompt to delete possible duplicates.
+      dups = list(set([item for sublist in [[i[:len(i)/2],i[len(i)/2:]] for i in self.query.execute("SELECT t1.*, t2.* FROM {0} t1 JOIN {0} t2 ON {1} WHERE ({2}) BETWEEN 2 AND {3} AND t1.{4}!=t2.{4}".format(table, ' OR '.join(['t1.{0}=t2.{0}'.format(c) for c in columns[1:]]), '+'.join(["(CASE WHEN t1.{0}=t2.{0} AND t1.{0} IS NOT NULL AND t1.{0} NOT IN ('None','null','NaN','') THEN 1 ELSE 0 END)".format(c) for c in columns[1:]]),len(columns[1:]),columns[0])).fetchall()] for item in sublist]))
+      if dups:
+        dups = [[repr(i) if isinstance(i, np.ndarray) else i for i in d] for d in dups]
+        print '\nPossible duplicates in {} table '.format(table.upper())+'='*(125-len(table))
+        u.printer(columns, dups, truncate=15)
+        if table=='sources': print "Resolve any issues for the SOURCES table using the SQLite Database Browser."
+        else:
+          delete = raw_input("Record ids to delete? [Press *Enter* for none] : ")
+          if delete:
+            if all([i.isdigit() for i in delete]):
+              delete = map(int, delete.split(','))
+              for ID in delete:
+                if ID in map(int, [i[0] for i in dups]):
+                  sure = raw_input('Are you sure you want to delete record {}? [y/n] : '.format(ID))
+                  if sure.lower()=='y':                  
+                    try: self.query.execute("DELETE FROM {} WHERE {}={}".format(table,columns[0],ID)), self.modify.commit()
+                    except IOError: print 'Could not delete record {}'.format(ID)
+                else: print "Id {} not in list of duplicates, bro.".format(ID)
+            else: print 'Just comma separated integers, please! No records deleted.'
   
   def identify(self, search):
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)

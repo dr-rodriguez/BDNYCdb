@@ -127,9 +127,8 @@ def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
     (w, f, sig), F = spectrum, np.interp(spectrum[0].value, model[0], model[1], left=0, right=0)*spectrum[1].unit
     weight = np.concatenate([np.array([0]),np.diff(w)])
     if exclude: weight[weight<np.std(weight)] = 0
-  # C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
   C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
-  G = ((f-F*C)/sig)**2
+  G = weight*((f-F*C)/sig)**2
   return [G if array else sum(G), C]
 
 def idx_include(x, include):
