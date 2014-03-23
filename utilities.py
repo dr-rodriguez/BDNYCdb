@@ -118,17 +118,17 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
 
 def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
   if isinstance(spectrum,dict) and isinstance(model,dict) and filt_dict:
-    bands, w, f, sig, F, weight = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])], [], [], [], [], []
+    bands, w, f, sig, Sig, F, weight = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])], [], [], [], [], [], []
     for eff,b in sorted([(filt_dict[i]['eff'],i) for i in bands]):
-      if spectrum[b] and spectrum[b+'_unc'] and model[b]: w.append(eff), f.append(spectrum[b]), sig.append(spectrum[b+'_unc']), F.append(model[b]), weight.append(filt_dict[b]['max']-filt_dict[b]['min'])
-    w, f, sig, F, weight = map(np.array, [w, f, sig, F, weight])
+      if spectrum[b] and spectrum[b+'_unc'] and model[b]: w.append(eff), f.append(spectrum[b]), sig.append(spectrum[b+'_unc']), F.append(model[b]), weight.append(filt_dict[b]['max']-filt_dict[b]['min']), Sig.append(model[b+'_unc'] if b+'_unc' in model.keys() else 0*model[b].unit)
+    w, f, sig, F, Sig, weight = map(np.array, [w, f, sig, F, Sig, weight])
   else:
     if exclude: spectrum = [i[idx_exclude(spectrum[0].value,exclude)] for i in spectrum]
-    (w, f, sig), F = spectrum, np.interp(spectrum[0].value, model[0], model[1], left=0, right=0)*spectrum[1].unit
+    (w, f, sig), F, Sig = spectrum, np.interp(spectrum[0].value, model[0], model[1], left=0, right=0)*spectrum[1].unit, 0*spectrum[1].unit
     weight = np.concatenate([np.array([0]),np.diff(w)])
     if exclude: weight[weight<np.std(weight)] = 0
-  C = sum(weight*f*F/sig**2)/sum(weight*(F/sig)**2)
-  G = weight*((f-F*C)/sig)**2
+  C = sum(weight*f*F/(sig**2 + Sig**2))/sum(weight*F**2/(sig**2 + Sig**2))
+  G = weight*(f-F*C)**2/(sig**2 + Sig**2)
   return [G if array else sum(G), C]
 
 def idx_include(x, include):
@@ -321,6 +321,15 @@ def pi2pc(parallax):
     d, sig_d = (1*q.pc*q.arcsec)/pi, sig_pi*q.pc*q.arcsec/pi**2
     return (d, sig_d)
   else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
+
+def prob_densities(data, data2='', xunits='', yunits='', xy=''):
+  from random import random
+  fig = plt.figure()
+  ax1 = plt.subplot2grid((4,4), (1,0), colspan=3, rowspan=3)
+  ax2, ax3 = plt.subplot2grid((4,4), (0,0), colspan=3, sharex=ax1), plt.subplot2grid((4,4), (1,3), rowspan=3, sharey=ax1)
+  if xy: ax1.plot(*xy, c='r', marker='s', markersize=12)
+  if data2: ax2.hist(data2[0], histtype='stepfilled', align='left', alpha=0.5), ax3.hist(data2[1], bins=6, histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5), ax1.scatter(*data2)   
+  ax2.hist(data[0], histtype='stepfilled', align='left', alpha=0.5), ax3.hist(data[1], bins=6, histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5), ax1.scatter(*data), ax1.set_xlim(400,3000), ax1.set_ylim(2.5,6.0), ax1.grid(True), ax2.grid(True), ax3.grid(True), ax2.xaxis.tick_top(), ax3.yaxis.tick_right(), fig.subplots_adjust(hspace=0, wspace=0) 
 
 def printer(labels, values, format='', truncate=100, to_txt=None):
   '''

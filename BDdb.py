@@ -153,31 +153,35 @@ class get_db:
     '''
     Removes exact duplicates from the specified *table* keeping the record with the lowest id. Then find duplicates and prompt for conflict resolution.
     '''
-    columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
-    self.query.execute("DELETE FROM {0} WHERE {1}".format(table, column[1]+' IS NULL' if len(columns)==2 else (' IS NULL AND '.join(columns[1:])+' IS NULL')))
-    self.query.execute("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:]))), self.modify.commit()
+    print 'Attemting clean up on table {}'.format(table.upper())
+    (columns, types), dup = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], 1
     
-    if table!='spectra': # Until I fix this SQL query!
-      # Print out similar records and prompt to delete possible duplicates.
-      dups = list(set([item for sublist in [[i[:len(i)/2],i[len(i)/2:]] for i in self.query.execute("SELECT t1.*, t2.* FROM {0} t1 JOIN {0} t2 ON {1} WHERE ({2}) BETWEEN 2 AND {3} AND t1.{4}!=t2.{4}".format(table, ' OR '.join(['t1.{0}=t2.{0}'.format(c) for c in columns[1:]]), '+'.join(["(CASE WHEN t1.{0}=t2.{0} AND t1.{0} IS NOT NULL AND t1.{0} NOT IN ('None','null','NaN','') THEN 1 ELSE 0 END)".format(c) for c in columns[1:]]),len(columns[1:]),columns[0])).fetchall()] for item in sublist]))
-      if dups:
-        dups = [[repr(i) if isinstance(i, np.ndarray) else i for i in d] for d in dups]
-        print '\nPossible duplicates in {} table '.format(table.upper())+'='*(125-len(table))
-        u.printer(columns, dups, truncate=15)
-        if table=='sources': print "Resolve any issues for the SOURCES table using the SQLite Database Browser."
-        else:
-          delete = raw_input("Record ids to delete? [Press *Enter* for none] : ")
-          if delete:
-            if all([i.isdigit() for i in delete]):
-              delete = map(int, delete.split(','))
-              for ID in delete:
-                if ID in map(int, [i[0] for i in dups]):
-                  sure = raw_input('Are you sure you want to delete record {}? [y/n] : '.format(ID))
-                  if sure.lower()=='y':                  
-                    try: self.query.execute("DELETE FROM {} WHERE {}={}".format(table,columns[0],ID)), self.modify.commit()
-                    except IOError: print 'Could not delete record {}'.format(ID)
-                else: print "Id {} not in list of duplicates, bro.".format(ID)
-            else: print 'Just comma separated integers, please! No records deleted.'
+    # Delete blank records, exact duplicates, or data without a source_id
+    self.query.execute("DELETE FROM {0} WHERE ({1})".format(table, columns[1]+' IS NULL' if len(columns)==2 else (' IS NULL AND '.join(columns[1:])+' IS NULL')))
+    self.query.execute("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:]))), self.modify.commit()
+    if 'source_id' in columns: self.query.execute("DELETE FROM {0} WHERE source_id IS NULL OR source_id IN ('null','None','')".format(table))
+    
+    if table in ['spectra','photometry','spectral_types','radial_velocities','parallaxes','proper_motions']:
+      primary, secondary, ignore = ['flux','magnitude','parallax','spectral_type','proper_motion_ra','proper_motion_dec','radial_velocity'], ['band'], []
+      while dup:
+        dup = self.query.execute("SELECT t1.*, t2.* FROM {0} AS t1 JOIN {0} AS t2 ON t1.source_id=t2.source_id WHERE t1.id!=t2.id AND t1.{1}=t2.{1}{2}{3}".format(table, [c for c in columns if c in primary].pop(), ' AND t1.{0}=t2.{0}'.format([c for c in columns if c in secondary].pop()) if [c for c in columns if c in secondary] else '', ' AND '+' OR '.join(['(t1.id NOT IN ({0}) AND t2.id NOT IN ({0}))'.format(','.join(map(str,i))) for i in ignore]) if ignore else '')).fetchone()
+        if dup:
+          old, new = dup[:len(dup)/2], dup[len(dup)/2:]
+          u.printer(columns, [[repr(i) if isinstance(i, np.ndarray) else i for i in old], [repr(i) if isinstance(i, np.ndarray) else i for i in new]], truncate=15)
+          replace = raw_input("Keep both records [k]? Or replace [r], complete [c], or keep only [Press *Enter*] record {}? : ".format(old[0]))
+          if replace.lower()=='r':
+            sure = raw_input('Are you sure you want to replace record {} with record {}? [y/n] : '.format(old[0],new[0]))
+            if sure.lower()=='y':
+              empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,n in zip(columns[1:],new[1:])])
+              self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), self.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), self.modify.commit()
+          elif replace.lower()=='c':
+            try:
+              empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,o,n in zip(columns[1:],old[1:],new[1:]) if o=='' and n!=''])
+              self.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), self.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), self.modify.commit()
+            except ValueError: self.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), self.modify.commit()
+          elif replace.lower()=='k': ignore.append([old[0],new[0]])
+          else: self.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), self.modify.commit()
+    print 'Finished clean up on table {}'.format(table.upper())
   
   def identify(self, search):
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
@@ -211,20 +215,25 @@ class get_db:
 
   def merge(self, conflicted):
     if os.path.isfile(conflicted):
-      con, master = get_db(conflicted), self.query.execute("PRAGMA database_list").fetchall()[0][2]
+      con, master, reassign = get_db(conflicted), self.query.execute("PRAGMA database_list").fetchall()[0][2], {}
       con.query.execute("ATTACH DATABASE '{}' AS m".format(master)), self.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), con.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), self.query.execute("ATTACH DATABASE '{}' AS m".format(master))
-            
-      for table in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1]:
-        columns, records = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1], self.query.execute("SELECT Count(*) FROM {}".format(table)).fetchone()[0]
-        data = map(list, con.query.execute("SELECT * FROM (SELECT 1 AS db, {0} FROM m.{1} UNION ALL SELECT 2 AS db, {0} FROM c.{1}) GROUP BY {0} HAVING COUNT(*)=1 AND db=2".format(','.join(columns[1:]),table)).fetchall())
+
+      for table in ['sources']+[t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1] if t!='sources']:
+        columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
+        data = map(list, con.query.execute("SELECT * FROM (SELECT 1 AS db, {0} FROM m.{2} UNION ALL SELECT 2 AS db, {0} FROM c.{2}) GROUP BY {1} HAVING COUNT(*)=1 AND db=2".format(','.join(columns),','.join(columns[1:]),table)).fetchall())
 
         if data:
           print "Merging table {}".format(table.upper())
-          for i in data: i[0] = None
+          for n,i in enumerate(data):
+            i = i[1:]
+            if table=='sources': reassign[i[0]] = self.query.execute("SELECT count(*) FROM sources").fetchone()[0]+1
+            elif 'source_id' in columns and i[1] in reassign.keys(): i[1] = reassign[i[1]]
+            else: pass
+            i[0] = None
+            data[n] = i
           self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for c in columns])), data), self.modify.commit()
           print "{} records added to {}:".format(len(data), master)
-          u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15)
-          self.clean_up(table)
+          u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15), self.clean_up(table)
         else: print "{} table identical.".format(table.upper())
       
       con.query.execute("DETACH DATABASE c"), self.query.execute("DETACH DATABASE c"), con.query.execute("DETACH DATABASE m"), self.query.execute("DETACH DATABASE m"), con.modify.close()
@@ -246,6 +255,19 @@ class get_db:
           csv.writer(f, delimiter='\t').writerow([' '])
       u.dict2txt({str(w):{'flux [{}]'.format(data['flux_units']):str(f), 'unc [{}]'.format(data['flux_units']):str(e)} for w,f,e in zip(data['wavelength'],data['flux'],data['unc'])}, fn, column1='# wavelength [{}]'.format(data['wavelength_units']), append=True)
     else: print "No spectrum found with id {}".format(spectrum_id)
+  
+  def fix_publications(self):
+    pubs = {j:i for i,j in self.query.execute("SELECT id,shortname FROM publications").fetchall()}
+    for table in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1]:
+      if 'publication_id' in zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]:
+        print "Fixing publication_ids in {}".format(table.upper())
+        for ID,short in self.query.execute("SELECT id,publication_id FROM {}".format(table)).fetchall():
+          if isinstance(short,str) and short:
+            if short.lower() in [i.lower() for i in pubs.keys()]: self.query.execute("UPDATE {} SET publication_id={} WHERE id={}".format(table,pubs[[i for i in pubs.keys() if i.lower()==short.lower()][0]],ID)), self.modify.commit()
+            else:
+              self.query.execute("INSERT INTO publications VALUES(?, ?, ?, ?, ?)", (None, None, short, None, None)), self.modify.commit()
+              pubs = {j:i for i,j in self.query.execute("SELECT id,shortname FROM publications").fetchall()}
+              self.query.execute("UPDATE {} SET publication_id={} WHERE id={}".format(table,pubs[short],ID)), self.modify.commit()
 
 # ==============================================================================================================================================
 # ================================= Adapters and converters for special data types =============================================================
