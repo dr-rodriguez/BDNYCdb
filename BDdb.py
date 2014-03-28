@@ -118,7 +118,7 @@ class get_db:
     Removes exact duplicates, blank records or data without a *source_id* from the specified **table**. Then finds possible duplicates and prompts for conflict resolution.
     '''
     print 'Attemting clean up on table {}'.format(table.upper())
-    (columns, types), dup = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], 1
+    (columns, types), dup, ignore = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], 1, []
     
     # Delete blank records, exact duplicates, or data without a source_id
     self.query.execute("DELETE FROM {0} WHERE ({1})".format(table, columns[1]+' IS NULL' if len(columns)==2 else (' IS NULL AND '.join(columns[1:])+' IS NULL')))
@@ -129,7 +129,9 @@ class get_db:
       primary, secondary, ignore = ['flux','magnitude','parallax','spectral_type','proper_motion_ra','proper_motion_dec','radial_velocity'], ['band'], []
       while dup:
         dup = self.query.execute("SELECT t1.*, t2.* FROM {0} AS t1 JOIN {0} AS t2 ON t1.source_id=t2.source_id WHERE t1.id!=t2.id AND t1.{1}=t2.{1}{2}{3}".format(table, [c for c in columns if c in primary].pop(), ' AND t1.{0}=t2.{0}'.format([c for c in columns if c in secondary].pop()) if [c for c in columns if c in secondary] else '', ' AND '+' OR '.join(['(t1.id NOT IN ({0}) AND t2.id NOT IN ({0}))'.format(','.join(map(str,i))) for i in ignore]) if ignore else '')).fetchone()
-        if dup: compare_records(self, table, columns, dup[:len(dup)/2], dup[len(dup)/2:], delete=True)
+        if dup:
+          I = compare_records(self, table, columns, dup[:len(dup)/2], dup[len(dup)/2:], delete=True)
+          if I: ignore.append(I)
     print 'Finished clean up on table {}'.format(table.upper())
   
   def identify(self, search):
@@ -269,31 +271,34 @@ def compare_records(db, table, columns, old, new, options=['r','c','k'], delete=
   pold, pnew = ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in old], ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in new]
   u.printer(columns, [pold,pnew], truncate=15, highlight=list(itertools.chain.from_iterable([[(i,n+1) for n,(ov,nv) in enumerate(zip(pold[1:],pnew[1:])) if ov!=nv] for i in range(2)])))
   replace = raw_input("Keep both records [k]? Or replace [r], complete [c], or keep only [Press *Enter*] record {}? (Type column name to inspect or 'help' for options): ".format(old[0]))
+
   while replace.lower() in columns or replace.lower()=='help':
     if replace.lower() in columns: u.printer(['id',replace.lower()], [[i for idx,i in enumerate(pold) if idx in [0,columns.index(replace.lower())]],[i for idx,i in enumerate(pnew) if idx in [0,columns.index(replace.lower())]]])    
     elif replace.lower()=='help': u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Displays full record entry for that column without taking action'],['k','Keep both records and assign second one new id'],['r','Replace all columns of first record with second record values'],['r [column name] [column name]...','Replace specified columns of first record with second record values'],['c','Completes empty columns of first record with second record values where possible'],['Otherwise','Keeps first record and deletes second']])
     replace = raw_input("Keep both records [k]? Or replace [r], complete [c], or keep only [Press *Enter*] record {}? (Type column name to inspect or 'help' for options): ".format(old[0]))
-  if replace.lower().startswith('r') and 'r' in options:
-    if replace.lower()=='r':
-      sure = raw_input('Are you sure you want to replace record {} with record {}? [y/n] : '.format(old[0],new[0]))
-      if sure.lower()=='y':
-        empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,n in zip(columns[1:],new[1:])])
+
+  if replace and not all([i in list(columns)+options for i in replace.lower().split()]):
+    if replace.lower().startswith('r') and 'r' in options:
+      if replace.lower()=='r':
+        sure = raw_input('Are you sure you want to replace record {} with record {}? [y/n] : '.format(old[0],new[0]))
+        if sure.lower()=='y':
+          empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,n in zip(columns[1:],new[1:])])
+          if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0]))
+          db.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
+      elif all([i in list(columns)+options for i in replace.lower().split()]):
+        empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,n in zip(columns[1:],new[1:]) if e in replace])
+        if empty_cols:
+          if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0]))
+          db.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
+    elif replace.lower()=='c' and 'c' in options:
+      try:
+        empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,o,n in zip(columns[1:],old[1:],new[1:]) if repr(o).lower() in ['','none','null'] and repr(n).lower() not in ['','none','null']])
         if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0]))
         db.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
-    else:
-      empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,n in zip(columns[1:],new[1:]) if e in replace])
-      if empty_cols:
-        if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0]))
-        db.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
-  elif replace.lower()=='c' and 'c' in options:
-    try:
-      empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,o,n in zip(columns[1:],old[1:],new[1:]) if repr(o).lower() in ['','none','null'] and repr(n).lower() not in ['','none','null']])
-      if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0]))
-      db.query.execute("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
-    except:
-      if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
-      else: pass
-  elif replace.lower()=='k' and 'k' in options: ignore.append([old[0],new[0]])
+      except:
+        if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
+        else: pass
+    elif replace.lower()=='k' and 'k' in options: return append([old[0],new[0]])
   else:
     if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
     else: pass
