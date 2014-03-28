@@ -8,7 +8,7 @@ from itertools import chain
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
-def app2abs(magnitude, distance): 
+def app2abs(magnitude, distance):
   if isinstance(magnitude,tuple) and isinstance(distance,tuple):
     (m, sig_m), (d, sig_d) = magnitude, distance
     sig_M = np.sqrt(sig_m**2 + 25*(sig_d/d).value**2)
@@ -331,23 +331,25 @@ def prob_densities(data, data2='', xunits='', yunits='', xy=''):
   if data2: ax2.hist(data2[0], histtype='stepfilled', align='left', alpha=0.5), ax3.hist(data2[1], bins=6, histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5), ax1.scatter(*data2)   
   ax2.hist(data[0], histtype='stepfilled', align='left', alpha=0.5), ax3.hist(data[1], bins=6, histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5), ax1.scatter(*data), ax1.set_xlim(400,3000), ax1.set_ylim(2.5,6.0), ax1.grid(True), ax2.grid(True), ax3.grid(True), ax2.xaxis.tick_top(), ax3.yaxis.tick_right(), fig.subplots_adjust(hspace=0, wspace=0) 
 
-def printer(labels, values, format='', truncate=100, to_txt=None):
+def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[]):
   '''
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
   '''
+  def red(t): print "\033[01;31m{0}\033[00m".format(t),
   print '\r'
-  values = [["None" if not i else "{:.10g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.10g} {}".format(i.value,i.unit) if hasattr(i,'unit') else i for i in j] for j in values]
+  values = [["-" if not i else "{:.6g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.6g} {}".format(i.value,i.unit) if hasattr(i,'unit') else i for i in j] for j in values]
   auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
   lengths = format if isinstance(format,list) else [min(truncate,i) for i in auto]
   col_len = [max(auto) for i in lengths] if format=='max' else [150/len(labels) for i in lengths] if format=='fill' else lengths
   for l,m in zip(labels,col_len):
     print str(l)[:truncate].ljust(m),
     if to_txt: txtFile.write(str(l)[:truncate].replace(' ','').ljust(m))
-  for v in values:
+  for row_num,v in enumerate(values):
     print '\n',
     if to_txt: txtFile.write('\n') 
-    for k,j in zip(v,col_len):
-      print str(k)[:truncate].ljust(j),
+    for col_num,(k,j) in enumerate(zip(v,col_len)):
+      if (row_num,col_num) in highlight: red(str(k)[:truncate].ljust(j))
+      else: print str(k)[:truncate].ljust(j),
       if to_txt: txtFile.write(str(k)[:truncate].replace(' ','').ljust(j))
   print '\n'
 

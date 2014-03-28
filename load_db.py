@@ -2,7 +2,6 @@
 # BDNYC database
 import io, os, glob, xlrd, cPickle, BDdb, sqlite3 as sql, astropy.io.fits as pf, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, utilities as u, astrotools as a
 path = '/Users/Joe/Documents/Python/'
-db = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/BDNYC.db')
 
 # ==============================================================================================================================================
 # ==============================================================================================================================================
