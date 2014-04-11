@@ -5,6 +5,8 @@ from random import random
 from heapq import nsmallest, nlargest
 from scipy.interpolate import Rbf
 from itertools import chain
+from pysynphot import observation
+from pysynphot import spectrum
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
@@ -30,6 +32,17 @@ def ChiSquare(a, b, unc=None, array=False, Gtest=False, norm=True, log=True):
   X2 = np.array([(j*np.log(j/i)/k)**2/i for i,j,k in zip(a,b,c)]) if Gtest else np.array([((i-j)/k)**2/variance for i,j,k in zip(a,b,c)])    
   if norm: X2 = abs(np.log10(X2/min(X2))/np.log10(min(X2))) if log else X2/max(X2)
   return X2 if array else sum(X2) 
+  
+def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet):
+  from scipy.interpolate import Rbf
+  from itertools import chain
+  xi, yi = np.meshgrid(np.linspace(min(x), max(x), 500), np.linspace(min(y), max(y), 25))
+  rbf = Rbf(x, y, z, function='linear')
+  zi = rbf(xi, yi)
+  plt.figure(figsize=figsize), plt.contourf(xi, yi, zi, levels, cmap=cmap), plt.colorbar(), plt.xlim(min(x),max(x)), plt.ylim(min(y),max(y)), plt.xlabel('Teff'), plt.ylabel('log(g)')
+  if best:
+    coords = min(zip(*[list(chain.from_iterable(zi)),list(chain.from_iterable(xi)),list(chain.from_iterable(yi))]))[1:]
+    plt.title('Teff = {}, log(g) = {}'.format(*coords)), plt.plot(*coords, c='white', marker='x')
   
 def deg2sxg(ra='', dec=''):
   RA, DEC = '', ''
@@ -116,19 +129,23 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
       if filters[i]['system'] not in systems: filters.pop(i)    
     return filters
 
-def goodness(spectrum, model, array=False, exclude=[], filt_dict=None):
-  if isinstance(spectrum,dict) and isinstance(model,dict) and filt_dict:
-    bands, w, f, sig, Sig, F, weight = [i for i in filt_dict.keys() if all([i in spectrum.keys(),i in model.keys()])], [], [], [], [], [], []
+def goodness(spec1, spec2, array=False, exclude=[], filt_dict=None, weighting=True, verbose=False):
+  if isinstance(spec1,dict) and isinstance(spec2,dict) and filt_dict:
+    bands, w1, f1, e1, f2, e2, weight, bnds = [i for i in filt_dict.keys() if all([i in spec1.keys(),i in spec2.keys()]) and i not in exclude], [], [], [], [], [], [], []
     for eff,b in sorted([(filt_dict[i]['eff'],i) for i in bands]):
-      if spectrum[b] and spectrum[b+'_unc'] and model[b]: w.append(eff), f.append(spectrum[b]), sig.append(spectrum[b+'_unc']), F.append(model[b]), weight.append(filt_dict[b]['max']-filt_dict[b]['min']), Sig.append(model[b+'_unc'] if b+'_unc' in model.keys() else 0*model[b].unit)
-    w, f, sig, F, Sig, weight = map(np.array, [w, f, sig, F, Sig, weight])
+      if spec1[b] and spec1[b+'_unc'] and spec2[b]: bnds.append(b), w1.append(eff), f1.append(spec1[b]), e1.append(spec1[b+'_unc']), f2.append(spec2[b]), e2.append(spec2[b+'_unc'] if b+'_unc' in spec2.keys() else 0*spec2[b].unit), weight.append((filt_dict[b]['max']-filt_dict[b]['min']) if weighting else 1)
+    bands, w1, f1, e1, f2, e2, weight = map(np.array, [bnds, w, f, sig, F, Sig, weight])
+    if verbose: printer(['Band','W_spec1','F_spec1','E_spec1','F_spec2','E_spec2','Weight','g-factor'],zip(*[bnds, w1, f1, e1, f2, e2, weight, weight*(f1-f2*(sum(weight*f1*f2/(e1**2 + e2**2))/sum(weight*f2**2/(e1**2 + e2**2))))**2/(e1**2 + e2**2)]))
   else:
-    if exclude: spectrum = [i[idx_exclude(spectrum[0].value,exclude)] for i in spectrum]
-    (w, f, sig), F, Sig = spectrum, np.interp(spectrum[0].value, model[0], model[1], left=0, right=0)*spectrum[1].unit, 0*spectrum[1].unit
-    weight = np.concatenate([np.array([0]),np.diff(w)])
-    if exclude: weight[weight<np.std(weight)] = 0
-  C = sum(weight*f*F/(sig**2 + Sig**2))/sum(weight*F**2/(sig**2 + Sig**2))
-  G = weight*(f-F*C)**2/(sig**2 + Sig**2)
+    spec1, spec2 = [[i.value if hasattr(i,'unit') else i for i in j] for j in [spec1,spec2]]
+    if exclude: spec1 = [i[idx_exclude(spec1[0],exclude)] for i in spec1]
+    # (w1, f1), e1, f2, e2 = spec1[:2], spec1[2] if len(spec1)==3 else 1, np.interp(spec1[0], spec2[0], spec2[1], left=0, right=0), np.interp(spec1[0], spec2[0], spec2[2], left=0, right=0) if len(spec2)==3 else 0
+    (w1, f1), e1, f2, e2 = spec1[:2], spec1[2] if len(spec1)==3 else 1, rebin_spec(spec2[0], spec2[1], spec1[0]), rebin_spec(spec2[0], spec2[2], spec1[0]) if len(spec2)==3 else 0
+    weight = np.array([(w1[n+1]-w1[n])/2. if n==0 else (w1[n]-w1[n-1])/2. if n==len(w1)-1 else (w1[n+1]-w1[n-1])/2. for n,i in enumerate(w1)])
+    if exclude: weight[weight>np.std(weight)] = 0
+  C = sum(weight*f1*f2/(e1**2 + e2**2))/sum(weight*f2**2/(e1**2 + e2**2))
+  G = weight*(f1-f2*C)**2/(e1**2 + e2**2)
+  if verbose: plt.loglog(spec2[0], spec2[1]*C, 'r', label='spec2', alpha=0.6), plt.loglog(w1, f1, 'k', label='spec1', alpha=0.6), plt.loglog(w1, f2*C, 'b', label='spec2 binned', alpha=0.6), plt.grid(True), plt.legend(loc=0)
   return [G if array else sum(G), C]
 
 def idx_include(x, include):
@@ -155,69 +172,74 @@ def mag2flux(band, mag, unc=None, Flam=False, photon=False):
   E = F - (zp*(filt['eff']*q.um if Flam else 1)*10**(-(mag+unc)/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/(1 if Flam else q.AA)) if unc else 1
   return [F,E] if unc else F 
   
-def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet):
-  from scipy.interpolate import Rbf
-  from itertools import chain
-  xi, yi = np.meshgrid(np.linspace(min(x), max(x), 500), np.linspace(min(y), max(y), 25))
-  rbf = Rbf(x, y, z, function='linear')
-  zi = rbf(xi, yi)
-  plt.figure(figsize=figsize), plt.contourf(xi, yi, zi, levels, cmap=cmap), plt.colorbar(), plt.xlim(min(x),max(x)), plt.ylim(min(y),max(y)), plt.xlabel('Teff'), plt.ylabel('log(g)')
-  if best:
-    coords = min(zip(*[list(chain.from_iterable(zi)),list(chain.from_iterable(xi)),list(chain.from_iterable(yi))]))[1:]
-    plt.title('Teff = {}, log(g) = {}'.format(*coords)), plt.plot(*coords, c='white', marker='x')
+def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b'):
+  if figure: fig, ax1, ax2, ax3 = figure
+  else:
+    fig = plt.figure()
+    ax1 = plt.subplot2grid((4,4), (1,0), colspan=3, rowspan=3)
+    ax2, ax3 = plt.subplot2grid((4,4), (0,0), colspan=3, sharex=ax1), plt.subplot2grid((4,4), (1,3), rowspan=3, sharey=ax1)
+  if xy: ax1.plot(*xy, c=color, marker='s', markersize=12)
+  ax2.hist(data[0], histtype='stepfilled', align='left', alpha=0.5, color=color), ax3.hist(data[1], histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5, color=color), ax1.scatter(*data, color=color), ax1.grid(True), ax2.grid(True), ax3.grid(True), ax2.xaxis.tick_top(), ax3.yaxis.tick_right()#, ax1.set_xlim(400,3000), ax1.set_ylim(2.5,6.0)
+  fig.subplots_adjust(hspace=0, wspace=0), fig.canvas.draw()
+  return [fig, ax1, ax2, ax3]
 
-def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, Rlim=(0,100), title=''):
+def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, Rlim=(0,100), title='', weighting=True):
   '''
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  fit_list, unfit_list, phot_fit = [], [], isinstance(SED,dict)
+  fit_list, unfit_list, phot_fit, dof = [], [], isinstance(SED,dict), 0
   model_dict = phot_dict if phot_fit else spec_dict
   if phot_fit:
     for b in SED.keys():
       if 'unc' not in b:
-        if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
+        dof += 1
+        if not SED[b] or not SED[b+'_unc']:
+          SED.pop(b), SED.pop(b+'_unc')
+          dof -= 1
     if all([b in SED for b in ['W3','W3_unc','W4','W4_unc']]):
       # If infrared excess, drop W4 since the models won't fit
-      if SED['W4']>SED['W3']: SED.pop('W4'), SED.pop('W4_unc')
+      if SED['W4']>SED['W3']:
+        SED.pop('W4'), SED.pop('W4_unc')
+        dof -= 1
   for k in model_dict.keys():
+    # W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
+    # good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict, weighting=weighting) if phot_fit else goodness(SED, [W,F], exclude=exclude, weighting=weighting)
+    # R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
+    # if R>Rlim[0] and R<Rlim[1]: fit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [W,F]))
+    # else: unfit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [W,F]))
+    
     W, F = spec_dict[k]['wavelength'], spec_dict[k]['flux']
-    good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict) if phot_fit else goodness(SED, [W,F], exclude=exclude)
+    good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict, weighting=weighting) if phot_fit else goodness(SED, [W,F], exclude=exclude, weighting=weighting)
     R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
     if R>Rlim[0] and R<Rlim[1]: fit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [W,F]))
     else: unfit_list.append((abs(good), k, float(const), phot_dict[k] if phot_fit else [W,F]))
+
   top5 = nsmallest(5,fit_list)
-  
-  # t1, t2 = min([int(i[1].split()[0]) for i in top5]), max([int(i[1].split()[0]) for i in top5])
-  # for g in np.arange(3.0,6.0,0.5):
-  #   for t in range(sorted([t2,t1])[0],sorted([t2,t1])[1],5)+[max([t1,t2])]:
-  #     d = modelInterp('{} {}'.format(t,g), model_dict, filt_dict=filt_dict if phot_fit else None)
-  #     good, const = goodness(SED, d, filt_dict=filt_dict) if phot_fit else goodness(SED, [d[0],d[1]], exclude=exclude)
-  #     R = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value
-  #     if R>Rlim[0] and R<Rlim[1]: fit_list.append([good, '{} {}'.format(t,g), const, d])
-  #     else: unfit_list.append([good, '{} {}'.format(t,g), const, d])
-  # 
-  # top5 = nsmallest(5,fit_list)
   printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
   
-  if plot and not phot_fit: 
+  if plot:
     from itertools import groupby
-    fig = plt.figure(figsize=(12,8))
-    ax1, ax2 = plt.subplot2grid((1,2), (0,0)), plt.subplot2grid((1,2), (0,1))
-    if exclude:
-      for mn,mx in exclude: ax1.add_patch(plt.Rectangle((mn,1E-20), mx-mn, 1E-10, color='k', alpha=0.1))
-    for key,group in [[k,list(grp)] for k,grp in groupby(sorted(fit_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
-      g, p, c, d = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
-      ax2.plot([int(t.split()[0]) for t in p], g, '-o', color=plt.cm.spectral((5.6-float(key))/2.4,1), label=key)
-    for key,group in [[k,list(grp)] for k,grp in groupby(sorted(unfit_list, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
-      g, p, c, d = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
-      ax2.plot([int(t.split()[0]) for t in p], g, 'x', ls='none', color=plt.cm.spectral((5.6-float(key))/2.4,1), label=key)
-    ax2.legend(loc=0, ncol=2), ax2.set_xlim(500,3000), ax2.grid(True), ax2.set_ylabel('Goodness of Fit'), ax2.set_xlabel('Teff'), ax2.yaxis.tick_right(), ax2.yaxis.set_label_position('right'), plt.suptitle(plot)
-    for idx,(g,p,c,(w,f)) in enumerate(top5): ax1.loglog(w[::25], smooth(f[::25],10)*c, label='{} / {} / {:.2f}'.format(p.split()[0],p.split()[1],float(dist*np.sqrt(c)) if dist else float(c)), color=plt.cm.spectral((idx+1.)/5.1,1))
-    ax1.loglog(*SED[:2], color='k'), ax1.grid(True), ax1.set_xlabel('Microns'), ax1.set_ylabel('Flux'), ax1.set_xlim(min(SED[0].value)*0.8,max(SED[0].value)*1.2), ax1.set_ylim(min(SED[1].value)*0.8,max(SED[1].value)*1.2), ax1.legend(loc=0)
-  
-  P, C, D = min(fit_list)[1:]
-  synW, synF = ([spec_dict[P]['wavelength'], spec_dict[P]['flux']] if P in spec_dict.keys() else modelInterp(P, spec_dict)) if phot_fit else D
-  return [[synW, synF*C], P, C]
+    fig, to_print = plt.figure(), []
+    for (ni,li) in [('fl',fit_list),('ul',unfit_list)]:
+      for key,group in [[k,list(grp)] for k,grp in groupby(sorted(li, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
+        g, p, c, d = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
+        # plt.plot([int(t.split()[0]) for t in p], g, 'o' if ni=='fl' else 'x', ls='-' if ni=='fl' else 'none', color=plt.cm.jet((5.6-float(key))/2.4,1), label=key)
+
+        plt.plot([int(t.split()[0]) for t in p], g, 'o' if ni=='fl' else 'x', ls='-' if ni=='fl' else 'none', color=plt.cm.jet((5.6-float(key))/2.4,1), label=key)
+
+        # to_print.append([[i,j] for i,j in zip(p,g)])
+    # if dof: 
+      # import scipy.stats as st
+      # plt.fill_between(plt.xlim(), [plt.ylim()[0],plt.ylim()[0]], [top5[0][0]+st.chi2.ppf(st.chi2.cdf(1,1),dof),top5[0][0]+st.chi2.ppf(st.chi2.cdf(1,1),dof)], color='k', alpha=0.1)
+    # printer(['Params','G-factor'],[val for subl in to_print for val in subl], to_txt='/Users/Joe/Desktop/{} - {} fit.txt'.format(plot,'phot' if phot_fit else 'spec'))
+    plt.legend(loc=0, ncol=2), plt.grid(True), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff'), plt.suptitle(plot)
+      
+  P, C, D = min(fit_list)[1:]   
+  res = np.average(np.diff(SED[0]))
+  synW, synF = spec_dict[P]['wavelength'], spec_dict[P]['flux']
+  # synF = rebin_spec(synW, synF, np.concatenate([  synW[0][np.where(synW[0]<SED[0][0])] , SED[0], synW[0][np.where(synW[0]>SED[0][-1])] ]))
+  synF = rebin_spec(synW, synF, SED[0])
+  return [[SED[0], synF*C], P, C]
 
 def modelInterp(params, model_dict, filt_dict=None, plot=False):
   '''
@@ -288,21 +310,26 @@ def normalize(spectra, template, composite=True, plot=False, SNR=100, exclude=[]
   if plot: plt.loglog(W, F, alpha=0.5), plt.fill_between(W, F-E, F+E, alpha=0.1)
     
   if composite:
-    for w,f,e in normalized:
-      IDX, idx = np.where(np.logical_and(W<w[-1],W>w[0]))[0], np.where(np.logical_and(w>W[0],w<W[-1]))[0]
-      if not any(IDX): normalized.append([w,f,e])
-      else:
-        (W0, F0, E0), (w0, f0, e0) = [i[IDX] for i in [W,F,E]], [i[idx] for i in [w,f,e]]
-        f0, e0 = np.interp(W0, w0, f0), np.interp(W0, w0, e0)
-        if exclude:
-          Eidx = idx_include(W0,exclude)
-          keep, E0[Eidx] = E0[Eidx], 1E-30
-        f_mean = np.array([np.average([fl,FL], weights=[1/er,1/ER]) for fl,er,FL,ER in zip(f0,e0,F0,E0)])
-        if exclude: E0[Eidx] = keep
-        e_mean = np.sqrt(e0**2 + E0**2)
-        spec1, spec2 = min([W,F,E], [w,f,e], key=lambda x: x[0][0]), max([W,F,E], [w,f,e], key=lambda x: x[0][-1])
-        spec1, spec2 = [i[np.where(spec1[0]<W0[0])[0]] for i in spec1], [i[np.where(spec2[0]>W0[-1])[0]] for i in spec2]
-        W, F, E = [np.concatenate([i,j,k]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
+    for n,(w,f,e) in enumerate(normalized):
+      tries = 0
+      while tries<3:
+        IDX, idx = np.where(np.logical_and(W<w[-1],W>w[0]))[0], np.where(np.logical_and(w>W[0],w<W[-1]))[0]
+        if not any(IDX):
+          normalized.pop(n), normalized.append([w,f,e])
+          tries += 1
+        else:
+          (W0, F0, E0), (w0, f0, e0) = [i[IDX] for i in [W,F,E]], [i[idx] for i in [w,f,e]]
+          f0, e0 = np.interp(W0, w0, f0), np.interp(W0, w0, e0)
+          if exclude:
+            Eidx = idx_include(W0,exclude)
+            keep, E0[Eidx] = E0[Eidx], 1E-30
+          f_mean = np.array([np.average([fl,FL], weights=[1/er,1/ER]) for fl,er,FL,ER in zip(f0,e0,F0,E0)])
+          if exclude: E0[Eidx] = keep
+          e_mean = np.sqrt(e0**2 + E0**2)
+          spec1, spec2 = min([W,F,E], [w,f,e], key=lambda x: x[0][0]), max([W,F,E], [w,f,e], key=lambda x: x[0][-1])
+          spec1, spec2 = [i[np.where(spec1[0]<W0[0])[0]] for i in spec1], [i[np.where(spec2[0]>W0[-1])[0]] for i in spec2]
+          W, F, E = [np.concatenate([i,j,k]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
+          tries = 5
 
     if replace: W, F, E = modelReplace([W,F,E], replace=replace, D_Flam=D_Flam)
 
@@ -321,15 +348,6 @@ def pi2pc(parallax):
     d, sig_d = (1*q.pc*q.arcsec)/pi, sig_pi*q.pc*q.arcsec/pi**2
     return (d, sig_d)
   else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
-
-def prob_densities(data, data2='', xunits='', yunits='', xy=''):
-  from random import random
-  fig = plt.figure()
-  ax1 = plt.subplot2grid((4,4), (1,0), colspan=3, rowspan=3)
-  ax2, ax3 = plt.subplot2grid((4,4), (0,0), colspan=3, sharex=ax1), plt.subplot2grid((4,4), (1,3), rowspan=3, sharey=ax1)
-  if xy: ax1.plot(*xy, c='r', marker='s', markersize=12)
-  if data2: ax2.hist(data2[0], histtype='stepfilled', align='left', alpha=0.5), ax3.hist(data2[1], bins=6, histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5), ax1.scatter(*data2)   
-  ax2.hist(data[0], histtype='stepfilled', align='left', alpha=0.5), ax3.hist(data[1], bins=6, histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5), ax1.scatter(*data), ax1.set_xlim(400,3000), ax1.set_ylim(2.5,6.0), ax1.grid(True), ax2.grid(True), ax3.grid(True), ax2.xaxis.tick_top(), ax3.yaxis.tick_right(), fig.subplots_adjust(hspace=0, wspace=0) 
 
 def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[]):
   '''
@@ -352,6 +370,13 @@ def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[]):
       else: print str(k)[:truncate].ljust(j),
       if to_txt: txtFile.write(str(k)[:truncate].replace(' ','').ljust(j))
   print '\n'
+
+def rebin_spec(wave, specin, wavnew, waveunits='um'):
+    spec = spectrum.ArraySourceSpectrum(wave=wave, flux=specin)
+    f = np.ones(len(wave))
+    filt = spectrum.ArraySpectralElement(wave, f, waveunits=waveunits)
+    obs = observation.Observation(spec, filt, binset=wavnew, force='taper')
+    return obs.binflux
 
 def rgb_image(images, save=''):
   '''
@@ -421,8 +446,8 @@ def str2Q(x,target=''):
   if x:       
     def Q(IN):
       OUT = 1
-      text = ['erg', '/s', 's-1', 's', '/um', 'um-1', 'um', '/cm2', 'cm-2', 'cm2', '/cm', 'cm-1', 'cm', '/A', 'A-1', 'A', 'W', '/m2', 'm-2', 'm2', '/m', 'm-1', 'm', '/Hz', 'Hz-1']
-      vals = [q.erg, q.s**-1, q.s**-1, q.s, q.um**-1, q.um**-1, q.um, q.cm**-2, q.cm**-2, q.cm**2, q.cm**-1, q.cm**-1, q.cm, q.AA**-1, q.AA**-1, q.AA, q.W, q.m**-2, q.m**-2, q.m**2, q.m**-1, q.m**-1, q.m, q.Hz**-1, q.Hz**-1]
+      text = ['Jy', 'erg', '/s', 's-1', 's', '/um', 'um-1', 'um', '/cm2', 'cm-2', 'cm2', '/cm', 'cm-1', 'cm', '/A', 'A-1', 'A', 'W', '/m2', 'm-2', 'm2', '/m', 'm-1', 'm', '/Hz', 'Hz-1']
+      vals = [q.Jy, q.erg, q.s**-1, q.s**-1, q.s, q.um**-1, q.um**-1, q.um, q.cm**-2, q.cm**-2, q.cm**2, q.cm**-1, q.cm**-1, q.cm, q.AA**-1, q.AA**-1, q.AA, q.W, q.m**-2, q.m**-2, q.m**2, q.m**-1, q.m**-1, q.m, q.Hz**-1, q.Hz**-1]
       for t,v in zip(text,vals):
         if t in IN:
           OUT = OUT*v

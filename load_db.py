@@ -318,14 +318,14 @@ def load_bt_settl_spectra(year=2013):
     W, F = [[i[idx] for i in lines[::20]] for idx in [0,1]]
     W = (np.array([float(w) for w in W])*q.AA).to(q.um)
     for n,w in enumerate(W):
-      if (w.value <= 0.2) or (w.value >= 40.0): Widx.append(n)                                                     
+      if (w.value <= 0.3) or (w.value >= 30.0): Widx.append(n)                                                     
     W, F = np.delete(W,Widx)*q.um, np.delete(F,Widx)
     return [T, G, W, ((10**np.array([float(f.replace('D','E')) for f in F]))*q.erg/q.s/q.cm**3).to(q.erg/q.s/q.cm**2/q.AA)]
     
   for f in files:
-    obj = read_btsettl(f)
     try:
+      obj = read_btsettl(f)
       syn.query.execute("INSERT INTO bt_settl_{} VALUES (?, ?, ?, ?, ?)".format(year), (None, obj[0], obj[1], obj[2].value, obj[3].value)), syn.modify.commit()
       print "{} {}".format(obj[0], obj[1])
-    except IOError: print "Failed: {} {}".format(obj[0], obj[1])
+    except: print "Failed: {} {}".format(obj[0], obj[1])
   syn.modify.close()    
