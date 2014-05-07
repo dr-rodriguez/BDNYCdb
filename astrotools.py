@@ -10,7 +10,9 @@ def filter_info(band):
   *band*
       Name of filter band (e.g. 'J' from 2MASS, 'W1' from WISE, etc.) or list of filter systems (e.g. ['SDSS','2MASS','WISE'])
   '''
-  Filters = { "U":      { 'eff': 0.357065, 'min': 0.303125, 'max': 0.417368, 'zp': 3.698499e-09, 'zp_photon': 6.5743e+02, 'ABtoVega':0, 'ext': 1.56, 'system': 'Bessel' }, 
+  Filters = { "FUV":    { 'eff': 0.154226, 'min': 0.134032, 'max': 0.180643, 'zp': 6.486815e-09, 'zp_photon': 5.0360e+02, 'ABtoVega':0, 'ext': 2.62, 'system': 'GALEX' },
+              "NUV":    { 'eff': 0.227437, 'min': 0.169252, 'max': 0.300667, 'zp': 4.511632e-09, 'zp_photon': 5.1658e+02, 'ABtoVega':0, 'ext': 2.94, 'system': 'GALEX' },
+              "U":      { 'eff': 0.357065, 'min': 0.303125, 'max': 0.417368, 'zp': 3.698499e-09, 'zp_photon': 6.5743e+02, 'ABtoVega':0, 'ext': 1.56, 'system': 'Bessel' }, 
               "B":      { 'eff': 0.437812, 'min': 0.363333, 'max': 0.549706, 'zp': 6.180252e-09, 'zp_photon': 1.3786e+03, 'ABtoVega':0, 'ext': 1.31, 'system': 'Bessel' }, 
               "V":      { 'eff': 0.544579, 'min': 0.473333, 'max': 0.687500, 'zp': 3.521649e-09, 'zp_photon': 9.8165e+02, 'ABtoVega':0, 'ext': 1.02, 'system': 'Bessel' },
               "R":      { 'eff': 0.641420, 'min': 0.550435, 'max': 0.883333, 'zp': 1.882309e-09, 'zp_photon': 6.3446e+02, 'ABtoVega':0, 'ext': 0.83, 'system': 'Bessel' },
@@ -28,6 +30,9 @@ def filter_info(band):
               "MKO_K":  { 'eff': 2.181858, 'min': 1.986393, 'max': 2.397097, 'zp': 4.086224e-11, 'zp_photon': 4.4883e+01, 'ABtoVega':0, 'ext': 0.12, 'system': 'MKO' },
               "MKO_L'": { 'eff': 3.732206, 'min': 3.326622, 'max': 4.207764, 'zp': 5.432256e-12, 'zp_photon': 1.0164e+01, 'ABtoVega':0, 'ext': 0.06, 'system': 'MKO' },
               "MKO_M'": { 'eff': 4.664426, 'min': 4.496502, 'max': 4.865044, 'zp': 2.251348e-12, 'zp_photon': 5.3049e+00, 'ABtoVega':0, 'ext': 0.05, 'system': 'MKO' },
+              "DENIS_I":  { 'eff': 0.78621,   'min': 0.7007, 'max': 0.9140, 'zp': 1.182035e-09, 'zp_photon': 4.6817e+02, 'ABtoVega':0, 'ext': 0.63, 'system': 'DENIS' },
+              "DENIS_J":  { 'eff': 1.22106,   'min': 1.0508, 'max': 1.3980, 'zp': 3.190860e-10, 'zp_photon': 1.9619e+02, 'ABtoVega':0, 'ext': 0.31, 'system': 'DENIS' },
+              "DENIS_Ks": { 'eff': 2.14650,   'min': 1.9474, 'max': 2.3979, 'zp': 4.341472e-11, 'zp_photon': 4.6916e+01, 'ABtoVega':0, 'ext': 0.13, 'system': 'DENIS' },              
               "W1":     { 'eff': 3.4,      'min': 2.754097, 'max': 3.872388, 'zp': 8.033283e-12, 'zp_photon': 1.3751e+01, 'ABtoVega':0, 'ext': 0.07, 'system': 'WISE' },
               "W2":     { 'eff': 4.6,      'min': 3.963326, 'max': 5.341360, 'zp': 2.385688e-12, 'zp_photon': 5.5870e+00, 'ABtoVega':0, 'ext': 0.05, 'system': 'WISE' },
               "W3":     { 'eff': 12,       'min': 7.443044, 'max': 17.26134, 'zp': 5.533295e-14, 'zp_photon': 3.5676e-01, 'ABtoVega':0, 'ext': 0.06, 'system': 'WISE' },
