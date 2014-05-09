@@ -536,7 +536,7 @@ def str2Q(x,target=''):
 
     return unit 
   else:
-    return 1 
+    return q.Unit('')
       
 def squaredError(a, b, c):
   '''
