@@ -1,10 +1,9 @@
 #!/usr/bin/python
 # Utilities
-import warnings, glob, os, re, xlrd, cPickle, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a
+import warnings, glob, os, re, xlrd, cPickle, itertools, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a, scipy.stats as st
 from random import random
 from heapq import nsmallest, nlargest
 from scipy.interpolate import Rbf
-from itertools import chain
 from pysynphot import observation
 from pysynphot import spectrum
 warnings.simplefilter('ignore')
@@ -21,14 +20,12 @@ def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
   return I if emitted else I*((radius*ac.R_jup)**2/(dist*q.pc)**2).decompose()
 
 def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet):
-  from scipy.interpolate import Rbf
-  from itertools import chain
   xi, yi = np.meshgrid(np.linspace(min(x), max(x), 500), np.linspace(min(y), max(y), 25))
   rbf = Rbf(x, y, z, function='linear')
   zi = rbf(xi, yi)
   plt.figure(figsize=figsize), plt.contourf(xi, yi, zi, levels, cmap=cmap), plt.colorbar(), plt.xlim(min(x),max(x)), plt.ylim(min(y),max(y)), plt.xlabel('Teff'), plt.ylabel('log(g)')
   if best:
-    coords = min(zip(*[list(chain.from_iterable(zi)),list(chain.from_iterable(xi)),list(chain.from_iterable(yi))]))[1:]
+    coords = min(zip(*[list(itertools.chain.from_iterable(zi)),list(itertools.chain.from_iterable(xi)),list(itertools.chain.from_iterable(yi))]))[1:]
     plt.title('Teff = {}, log(g) = {}'.format(*coords)), plt.plot(*coords, c='white', marker='x')
   
 def deg2sxg(ra='', dec=''):
@@ -126,8 +123,6 @@ def goodness(spec1, spec2, array=False, exclude=[], filt_dict=None, weighting=Tr
   else:
     spec1, spec2 = [[i.value if hasattr(i,'unit') else i for i in j] for j in [spec1,spec2]]
     if exclude: spec1 = [i[idx_exclude(spec1[0],exclude)] for i in spec1]
-    # (w1, f1), e1, f2, e2 = spec1[:2], spec1[2] if len(spec1)==3 else 1, np.interp(spec1[0], spec2[0], spec2[1], left=0, right=0), np.interp(spec1[0], spec2[0], spec2[2], left=0, right=0) if len(spec2)==3 else 0
-    # weight = np.array([(w1[n+1]-w1[n])/2. if n==0 else (w1[n]-w1[n-1])/2. if n==len(w1)-1 else (w1[n+1]-w1[n-1])/2. for n,i in enumerate(w1)])
     (w1, f1, e1), (f2, e2), weight = spec1, rebin_spec(spec2, spec1[0])[1:], np.gradient(spec1[0])
     if exclude: weight[weight>np.std(weight)] = 0
   C = sum(weight*f1*f2/(e1**2 + e2**2))/sum(weight*f2**2/(e1**2 + e2**2))
@@ -157,155 +152,82 @@ def mag2flux(band, mag, sig_m='', Flam=False, photon=False):
   sig_f = f*sig_m*np.log(10)/2.5 if sig_m else ''
   return (f, sig_f)
   
-def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8):
+def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
   else:
     fig = plt.figure()
     ax1 = plt.subplot2grid((4,4), (1,0), colspan=3, rowspan=3)
     ax2, ax3 = plt.subplot2grid((4,4), (0,0), colspan=3, sharex=ax1), plt.subplot2grid((4,4), (1,3), rowspan=3, sharey=ax1)
-  if xy: ax1.plot(*xy, c=color, marker=marker, markersize=markersize+4)
-  ax2.hist(data[0], histtype='stepfilled', align='left', alpha=0.5, color=color), ax3.hist(data[1], histtype='stepfilled', orientation='horizontal', align='left', alpha=0.5, color=color), ax1.scatter(*data, color=color, marker=marker, alpha=0.7, s=markersize), ax1.grid(True), ax2.grid(True), ax3.grid(True), ax2.xaxis.tick_top(), ax3.yaxis.tick_right()#, ax1.set_xlim(400,3000), ax1.set_ylim(2.5,6.0)
-  fig.subplots_adjust(hspace=0, wspace=0), fig.canvas.draw()
-  return [fig, ax1, ax2, ax3]
+  if xy: ax1.plot(*xy, c='k', marker=marker, markersize=markersize+2)
+  xmin, xmax, ymin, ymax = 700, 3000, 3.5, 6
+  X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+  positions = np.vstack([X.ravel(), Y.ravel()])
+  values = np.vstack(data[:2])
+  kernel = st.gaussian_kde(values)
+  Z = np.reshape(kernel(positions).T, X.shape)
+  ax1.set_xlim([xmin,xmax]), ax1.set_ylim([ymin,ymax]), ax1.imshow(np.rot90(Z), cmap=plt.cm.jet, extent=[xmin, xmax, ymin, ymax], aspect='auto'), ax2.hist(data[0], 24, histtype='stepfilled', normed=True, align='mid', alpha=0.5, color=color), ax3.hist(data[1], 4, histtype='stepfilled', normed=True, orientation='horizontal', align='mid', alpha=0.5, color=color), ax1.grid(True), ax2.grid(True), ax3.grid(True), ax2.xaxis.tick_top(), ax3.yaxis.tick_right()
+  T, G = st.mode(data[0]), st.mode(data[1])
+  teff, teff_frac, logg, logg_frac = T[0][0], T[1][0]/len(data[0]), G[0][0], G[1][0]/len(data[0]) 
+  ax1.axvline(x=teff, color='#ffffff'), ax1.axhline(y=logg, color='#ffffff'), ax1.plot(teff, logg, marker='o', color='#ffffff', zorder=2), ax1.set_xlabel('Teff'), ax1.set_ylabel('log(g)'), plt.title('{} {}'.format(teff,logg)), fig.subplots_adjust(hspace=0, wspace=0), fig.canvas.draw()
+  if save: plt.savefig(save)
+  return [teff, teff_frac, logg, logg_frac]
 
-# # Attempting to make fitting combining both spectra and photometry
-# def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', exclude=[], replace=[], plot=False, Rlim=(0,100), title='', weighting=True, verbose=False, save=''):
-#   '''
-#   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
-#   '''
-#   for b in photometry.keys():
-#     if 'unc' not in b:
-#       if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
-#       if fit=='overlap':
-#         try: 
-#           if filtDict[b]['min']<spectrum[0][0] or filtDict[b]['max']>spectrum[0][-1]: photometry.pop(b), photometry.pop(b+'_unc')
-#         except: pass
-#   if all([b in photometry for b in ['W3','W3_unc','W4','W4_unc']]):
-#     if photometry['W4']>photometry['W3']: photometry.pop('W4'), photometry.pop('W4_unc')
-# 
-#   f_spec = np.trapz(spectrum[1], x=spectrum[0])*q.um*q.erg/q.s/q.cm**2/q.AA
-#   spec_fit_list, spec_unfit_list, phot_fit_list, phot_unfit_list = [], [], [], []
-# 
-#   for k in specDict.keys():
-#     w, f = specDict[k]['wavelength'], specDict[k]['flux'] 
-#     if fit in ['spec','both','overlap']:
-#       spec_good, spec_const = goodness(spectrum, [spectrum[0],rebin_spec(specDict[k]['wavelength'], specDict[k]['flux'], spectrum[0], waveunits='um')], filt_dict=filtDict, exclude=exclude, weighting=weighting)
-#       spec_r, spec_f = (dist*np.sqrt(float(spec_const))/ac.R_jup).decompose().value, f*spec_const
-#       spec_f_model = (np.trapz(spec_f[w<spectrum[0][0].value], x=w[w<spectrum[0][0].value]) + np.trapz(spec_f[w>spectrum[0][-1].value], x=w[w>spectrum[0][-1].value]))*q.um*q.erg/q.s/q.cm**2/q.AA
-#       spec_lbol = np.log10((4*np.pi*(f_spec+spec_f_model)*(10*q.pc)**2).to(q.erg/q.s)/ac.L_sun.to(q.erg/q.s))
-#       if spec_r>Rlim[0] and spec_r<Rlim[1]: spec_fit_list.append((abs(spec_good), k, float(spec_const), spec_r, spec_lbol))
-#       else: spec_unfit_list.append((abs(spec_good), k, float(spec_const), spec_r, spec_lbol))
-#     if fit in ['phot','both','overlap']:
-#       phot_good, phot_const = goodness(photometry, photDict[k], filt_dict=filtDict, exclude=exclude, weighting=weighting)
-#       phot_r, phot_f = (dist*np.sqrt(float(phot_const))/ac.R_jup).decompose().value, f*phot_const
-#       phot_f_model = (np.trapz(phot_f[w<spectrum[0][0].value], x=w[w<spectrum[0][0].value]) + np.trapz(phot_f[w>spectrum[0][-1].value], x=w[w>spectrum[0][-1].value]))*q.um*q.erg/q.s/q.cm**2/q.AA
-#       phot_lbol = np.log10((4*np.pi*(f_spec+phot_f_model)*(10*q.pc)**2).to(q.erg/q.s)/ac.L_sun.to(q.erg/q.s))
-#       if phot_r>Rlim[0] and phot_r<Rlim[1]: phot_fit_list.append((abs(phot_good), k, float(phot_const), phot_r, phot_lbol))
-#       else: phot_unfit_list.append((abs(phot_good), k, float(phot_const), phot_r, phot_lbol))
-#   
-#   MD = marginalized_distribution(zip(*[map(float,i.split()) for i in zip(*spec_fit_list)[1]]), xy=map(float,min(spec_fit_list)[1].split()), color='b', marker='o', markersize=8)
-#   MD = marginalized_distribution(zip(*[map(float,i.split()) for i in zip(*phot_fit_list)[1]]), xy=map(float,min(phot_fit_list)[1].split()), color='r', marker='x', markersize=12, figure=MD)
-# 
-#   G, P, C, R, L = min(spec_fit_list)
-#   return [[specDict[P]['wavelength']*q.um, specDict[P]['flux']*C*q.erg/q.s/q.cm**2/q.AA], P, C, R] if fit!='spec' else [[spectrum[0], rebin_spec(specDict[P]['wavelength'], specDict[P]['flux'], spectrum[0])*C*spectrum[1].unit], P, C, R]
+def montecarlo(spectrum, modelDict, N=100, save=''):
+  G = []
+  for p in modelDict.keys():
+    model, g = rebin_spec([modelDict[p]['wavelength'],modelDict[p]['flux']], spectrum[0]), []
+    for _ in itertools.repeat(None,N): g.append((goodness(spectrum, [model[0], model[1]*abs(np.random.normal(size=len(model[1]))), model[2]])[0], int(p.split()[0]), float(p.split()[1])))
+    G.append(g)
+  bests = [min(i) for i in zip(*G)]
+  fits, teff, logg = zip(*bests)
+  result = marginalized_distribution([teff, logg, fits], save=save)
+  return result
 
-def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', uncertainty=True, exclude=[], replace=[], plot=False, Rlim=(0,100), title='', weighting=True, verbose=False, save=''):
+def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', exclude=[], replace=[], plot=False, Rlim=(0,100), title='', weighting=True, verbose=False, save=''):
   '''
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  if fit=='phot' or fit=='spec':
-    fit_list, unfit_list, phot_fit = [], [], True if fit=='phot' else False
-    model_dict, Wm = photDict if phot_fit else specDict, np.arange(0.3,30,np.average(np.diff(spectrum[0])))
-    
-    if phot_fit:
-      for b in photometry.keys():
-        if 'unc' not in b:
-          if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
-      if all([b in photometry for b in ['W3','W3_unc','W4','W4_unc']]):
-        # If infrared excess, drop W4 since the models won't fit
-        if photometry['W4']>photometry['W3']: photometry.pop('W4'), photometry.pop('W4_unc')
-   
-    f_spec = np.trapz(spectrum[1], x=spectrum[0])*q.um*q.erg/q.s/q.cm**2/q.AA
-    for k in model_dict.keys():
+  fit_list, unfit_list, phot_fit, model_dict = [], [], True if fit=='phot' else False, photDict if fit=='phot' else specDict
+  for b in photometry.keys():
+    if 'unc' not in b:
+      if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
+  
+  f_spec = (np.trapz(spectrum[1], x=spectrum[0]) - (np.trapz(spectrum[1][idx_include(spectrum[0],replace)], x=spectrum[0][idx_include(spectrum[0],replace)]) if replace else 0))*q.um*q.erg/q.s/q.cm**2/q.AA
+  for k in model_dict.keys():
+    try:
       w, f = specDict[k]['wavelength'], specDict[k]['flux'] 
-      good, const = goodness(photometry if phot_fit else spectrum, photDict[k] if phot_fit else rebin_spec([specDict[k]['wavelength'],specDict[k]['flux']], spectrum[0], waveunits='um'), filt_dict=filtDict, exclude=exclude, weighting=weighting)
+      good, const = goodness(photometry if phot_fit else spectrum, model_dict[k] if phot_fit else rebin_spec([specDict[k]['wavelength'],specDict[k]['flux']], spectrum[0], waveunits='um'), filt_dict=filtDict, exclude=exclude, weighting=weighting)
       radius, f = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value, f*const
       f_model = (np.trapz(f[w<spectrum[0][0].value], x=w[w<spectrum[0][0].value]) + np.trapz(f[w>spectrum[0][-1].value], x=w[w>spectrum[0][-1].value]) + np.trapz(f[idx_include(w,replace)], x=w[idx_include(w,replace)]))*q.um*q.erg/q.s/q.cm**2/q.AA
       lbol = np.log10((4*np.pi*(f_spec+f_model)*(10*q.pc)**2).to(q.erg/q.s)/ac.L_sun.to(q.erg/q.s))
-      if radius>Rlim[0] and radius<Rlim[1]: fit_list.append((abs(good), k, float(const), radius, lbol))
-      else: unfit_list.append((abs(good), k, float(const), radius, lbol))
-    
-    if uncertainty:
-      # Generate uncertainty array from fits that fall within 1 sigma of best fit. 
-      pass
+      if radius>Rlim[0] and radius<Rlim[1]: fit_list.append([abs(good), k, float(const), radius, lbol, [w,f]])
+      else: unfit_list.append([abs(good), k, float(const), radius, lbol, [w,f]])
+    except: pass
       
-    top5 = nsmallest(5,fit_list)
-    printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0], i[1], (dist*np.sqrt(i[2])/ac.R_jup).decompose()] for i in top5] if dist else top5)
-  
-    if plot:
-      from itertools import groupby
-      fig, to_print = plt.figure(), []
-      for (ni,li) in [('fl',fit_list),('ul',unfit_list)]:
-        for key,group in [[k,list(grp)] for k,grp in groupby(sorted(li, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
-          g, p, c, r, l = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
-          plt.plot([int(t.split()[0]) for t in p], g, 'o' if ni=='fl' else 'x', ls='-' if ni=='fl' else 'none', color=plt.cm.jet((5.6-float(key))/2.4,1), label=key if ni=='fl' else None)
-          to_print += zip(*[p,g,r,l])
-      plt.legend(loc=0), plt.grid(True), plt.yscale('log'), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff'), plt.suptitle(plot) 
-      if save: plt.savefig(save+' - fit plot.png')#, printer(['Params','G','radius','Lbol'], to_print, to_txt=save+' - fit.txt')
-      
-    G, P, C, R, L = min(fit_list)
-    if plot and verbose:
-      plt.figure(), plt.loglog(specDict[P]['wavelength'], specDict[P]['flux']*C, alpha=0.6), plt.grid(True), plt.xlabel('Flux Density'), plt.ylabel('Wavelength')
-      if phot_fit:
-        for i in photometry.keys():
-          if '_unc' not in i and photometry[i]:        
-            try: plt.errorbar(filtDict[i]['eff'], photometry[i], yerr=[[photometry[i]/1.5],[photometry[i]]] if not photometry[i+'_unc'] else [[photometry[i+'_unc']],[photometry[i+'_unc']]], lolims=1 if not photometry[i+'_unc'] else 0, fmt='ko', alpha=0.8, zorder=3)
-            except (TypeError,KeyError): pass
-      else: plt.loglog(*spectrum[:2], alpha=0.6)
-  else:
-    good, C = goodness(spectrum, [specDict[fit]['wavelength'],specDict[fit]['flux']], filt_dict=filtDict, exclude=exclude, weighting=weighting)
-    R, P = (dist*np.sqrt(float(C))/ac.R_jup).decompose().value, fit
+  # Generate uncertainty array from fits that fall within 1 sigma of best fit. 
+  fits, dof = sorted(fit_list), len(photometry)/2 if phot_fit else len(spectrum[0])
+  min_Chi = fits.pop([n for n,i in enumerate(fits) if fits[n][1]==fit][0] if fit in model_dict else 0)
+  one_sigs = [i for i in fits if (i[0]/min_Chi[0])<=1+(st.chi2.ppf(st.chi2.cdf(1,1),dof)/dof)]
+  for n,i in enumerate(one_sigs): one_sigs[n][5] = rebin_spec(one_sigs[n][5], min_Chi[5][0])[1] if len(one_sigs[n][5][1])!=len(min_Chi[5][1]) else one_sigs[n][5][1]
+  final_spec = [min_Chi[5][0]*q.um, min_Chi[5][1]*q.erg/q.s/q.cm**2/q.AA, np.maximum.reduce([np.array(map(abs,min_Chi[5][1]-i[5])) for i in one_sigs])*q.erg/q.s/q.cm**2/q.AA if one_sigs else abs(min_Chi[5][1]-(rebin_spec(fits[1][5], min_Chi[5][0])[1] if len(fits[1][5][1])!=len(min_Chi[5][1]) else fits[1][5][1]))*q.erg/q.s/q.cm**2/q.AA]
+  printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2', 'Lbol'], [[i[0], i[1], i[3] if dist else i[2], i[4]] for i in one_sigs])
 
-  return [[specDict[P]['wavelength']*q.um, specDict[P]['flux']*C*q.erg/q.s/q.cm**2/q.AA], P, C, R] if fit!='spec' else [[spectrum[0], rebin_spec([specDict[P]['wavelength'], specDict[P]['flux']], spectrum[0])[1]*C*spectrum[1].unit], P, C, R]
+  if plot:
+    # for i in one_sigs: plt.loglog(final_spec[0][::40], i[5][::40], color='0.5', alpha=0.5)
+    # plt.loglog(final_spec[0][::40], final_spec[1][::40], c='k', lw=2, alpha=0.7), plt.fill_between(final_spec[0][::40], final_spec[1][::40]-final_spec[2][::40], final_spec[1][::40]+final_spec[2][::40], color='k', alpha=0.3)
+    # plt.loglog(spectrum[0], spectrum[1], c='b', alpha=0.7), plt.fill_between(spectrum[0], spectrum[1]-spectrum[2], spectrum[1]+spectrum[2], color='b', alpha=0.3)
+    # plt.yscale('log', nonposy='clip')
+    from itertools import groupby
+    fig, to_print = plt.figure(), []
+    for (ni,li) in [('fl',fit_list),('ul',unfit_list)]:
+      for key,group in [[k,list(grp)] for k,grp in groupby(sorted(li, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
+        g, p, c, r, l, sp = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))
+        plt.plot([int(t.split()[0]) for t in p], g, 'o' if ni=='fl' else 'x', ls='-' if ni=='fl' else 'none', color=plt.cm.jet((5.6-float(key))/2.4,1), label=key if ni=='fl' else None)
+        to_print += zip(*[p,g,r,l])
+    plt.legend(loc=0), plt.grid(True), plt.yscale('log'), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff'), plt.suptitle(plot) 
+    if save: plt.savefig(save+' - fit plot.png')#, printer(['Params','G','radius','Lbol'], to_print, to_txt=save+' - fit.txt')
 
-# def modelFit(SED, phot_dict, spec_dict, dist='', filt_dict=None, exclude=[], plot=False, Rlim=(0,100), title='', weighting=True):
-#   '''
-#   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
-#   '''
-#   fit_list, unfit_list, phot_fit = [], [], isinstance(SED,dict)
-#   model_dict = phot_dict if phot_fit else spec_dict
-#   if phot_fit:
-#     for b in SED.keys():
-#       if 'unc' not in b:
-#         if not SED[b] or not SED[b+'_unc']: SED.pop(b), SED.pop(b+'_unc')
-#     if all([b in SED for b in ['W3','W3_unc','W4','W4_unc']]):
-#       # If infrared excess, drop W4 since the models won't fit
-#       if SED['W4']>SED['W3']: SED.pop('W4'), SED.pop('W4_unc')
-#   for k in model_dict.keys():
-#     good, const = goodness(SED, phot_dict[k], filt_dict=filt_dict, weighting=weighting) if phot_fit else goodness(SED, [spec_dict[k]['wavelength'],spec_dict[k]['flux']], exclude=exclude, weighting=weighting)
-#     if dist:
-#       R = (dist[0]*np.sqrt(float(const))/ac.R_jup).decompose().value
-#       sigR = (dist[1]*np.sqrt(float(const))/ac.R_jup).decompose().value
-#       if R>Rlim[0] and R<Rlim[1]: fit_list.append((abs(good), k, float(const), (R, sigR)))
-#       else: unfit_list.append((abs(good), k, float(const), (R, sigR)))
-#     else: fit_list.append((abs(good), k, float(const)))
-# 
-#   oneSigma = [i for i in fit_list if (i[0]-sorted(fit_list)[0][0])<=st.chi2.ppf(st.chi2.cdf(1,1),len(SED)/2)]
-#   printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2'], [[i[0]-sorted(oneSigma)[0][0], i[1], i[3] if dist else i[2]] for i in oneSigma])
-# 
-#   if plot:
-#     from itertools import groupby
-#     fig, to_print = plt.figure(), []
-#     for (ni,li) in [('fl',fit_list),('ul',unfit_list)]:
-#       for key,group in [[k,list(grp)] for k,grp in groupby(sorted(li, key=lambda x: x[1].split()[1]), lambda x: x[1].split()[1])]:
-#         g, p, c = zip(*sorted(group, key=lambda x: int(x[1].split()[0])))[:3]
-#         plt.plot([int(t.split()[0]) for t in p], g, 'o' if ni=='fl' else 'x', ls='-' if ni=='fl' else 'none', color=plt.cm.jet((5.6-float(key))/2.4,1), label=key)
-#         # for i,j,k in zip(p,g,r): to_print.append([i.split()[0],i.split()[1],j,k[0]])
-#     # printer(['Teff','log(g)','G','radius'], to_print, to_txt='/Users/Joe/Desktop/{}.txt'.format(plot))
-#     plt.legend(loc=0, ncol=2), plt.grid(True), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff'), plt.suptitle(plot)
-# 
-#   G, P, C = min(oneSigma)[:3]
-#   return [[spec_dict[P]['wavelength'], spec_dict[P]['flux']*C], P, C] if phot_fit else [[SED[0], rebin_spec(spec_dict[P]['wavelength'], spec_dict[P]['flux'], SED[0])*C*SED[1].unit], P, C]
+  return [final_spec, min_Chi[1], min_Chi[2], min_Chi[3], min_Chi[4]]
 
 def modelInterp(params, model_dict, filt_dict=None, plot=False):
   '''
@@ -336,8 +258,7 @@ def modelReplace(spectrum, model, replace=[], tails=False, plot=False):
   '''
   Spec, mSpec = [[i.value if hasattr(i,'unit') else i for i in j] for j in [spectrum,model]]
   if tails: replace += [(0.3,Spec[0][0]),(Spec[0][-1],30)]
-  Spec = [i[idx_exclude(Spec[0],replace)] for i in Spec]
-  mSpec = [i[idx_include(mSpec[0],replace)] for i in [mSpec[0], mSpec[1], mSpec[1]/np.average(Spec[1]/Spec[2])]] if len(mSpec)==2 and len(Spec)==3 else [i[idx_include(mSpec[0],replace)] for i in mSpec]
+  Spec, mSpec = [i[idx_exclude(Spec[0],replace)] for i in Spec], [i[idx_include(mSpec[0],replace)] for i in mSpec]
   newSpec = map(np.array,zip(*sorted(zip(*[np.concatenate(i) for i in zip(Spec,mSpec)]), key=lambda x: x[0])))
   if plot: plt.figure(), plt.loglog(*model[:2], color='r', alpha=0.8), plt.loglog(*spectrum[:2], color='b', alpha=0.8), plt.loglog(*newSpec[:2], color='k', ls='--'), plt.legend(loc=0)
   return [i*j for i,j in zip(newSpec,[k.unit if hasattr(k,'unit') else 1 for k in spectrum])]
@@ -388,14 +309,10 @@ def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[],
             normalized.pop(n), normalized.append([w,f,e])
             tries += 1
           else:
-            (W0, F0, E0), (w0, f0, e0) = [i[IDX] for i in [W,F,E]], [i[idx]*q.Unit('') for i in [w,f,e]]
+            if len(IDX)<=len(idx): (W0, F0, E0), (w0, f0, e0) = [i[IDX]*q.Unit('') for i in [W,F,E]], [i[idx]*q.Unit('') for i in [w,f,e]]
+            else: (W0, F0, E0), (w0, f0, e0) = [i[idx]*q.Unit('') for i in [w,f,e]], [i[IDX]*q.Unit('') for i in [W,F,E]]
             f0, e0 = rebin_spec([w0,f0,e0], W0)[1:]
-            if exclude:
-              Eidx = idx_include(W0,exclude)
-              keep, E0[Eidx] = E0[Eidx], 1E-30
-            f_mean = np.array([np.average([fl,FL], weights=[1/er,1/ER]) for fl,er,FL,ER in zip(f0,e0,F0,E0)])
-            if exclude: E0[Eidx] = keep
-            e_mean = np.sqrt(e0.value**2 + E0**2)
+            f_mean, e_mean = np.array([np.average([fl,FL], weights=[1/er,1/ER]) for fl,er,FL,ER in zip(f0,e0,F0,E0)]), np.sqrt(e0**2 + E0**2)            
             spec1, spec2 = min([W,F,E], [w,f,e], key=lambda x: x[0][0]), max([W,F,E], [w,f,e], key=lambda x: x[0][-1])
             spec1, spec2 = [i[np.where(spec1[0]<W0[0])[0]] for i in spec1], [i[np.where(spec2[0]>W0[-1])[0]] for i in spec2]
             W, F, E = [np.concatenate([i,j,k]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
