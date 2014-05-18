@@ -109,8 +109,12 @@ class get_db:
     except: airmass = 0
     
     try:
-      wav, flx, err = u.unc(a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0])
-      regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>3 else None     
+      data = a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0]
+      wav, flx = data[:2]
+      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>5 else None     
+      else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>50000 else None     
+      try: err = data[2]
+      except: err = ''
       try: snr = flx/err if any(flx) and any(err) else None
       except (TypeError,IndexError): snr = None
       try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
@@ -153,7 +157,7 @@ class get_db:
     if results: u.printer(['id','ra','dec','designation','unum','short','names'], results)
     else: print "No objects found by {}".format(search)
       
-  def inventory(self, ID='', unum='', with_pi=False, SED=False, plot=False, data=False):
+  def inventory(self, ID='', unum='', verbose=False, with_pi=False, SED=False, plot=False, data=False):
     '''
     Prints a summary of all objects in the database. Input string or list of strings in **ID** or **unum** for specific objects.
     '''
@@ -177,6 +181,13 @@ class get_db:
         if data: return D
       else: print "No sources found{}.".format(' with id '+str(ID) if ID else '')
     except IndexError: pass
+    if ID and verbose:
+      for table in [t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1] if t!='sources']:
+        columns, types = map(list,zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3])
+        if 'source_id' in columns:
+          data = map(list, self.query.execute("SELECT * FROM {} WHERE source_id={}".format(table,ID)).fetchall())
+          for d in data+[columns,types]: d.pop(1)
+          if data: u.printer([c.replace('wavelength_units','units').replace('flux_units','units').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('wavelength','wav').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=15 if table=='spectra' else 50, title=table.upper())
 
   def merge(self, conflicted):
     '''
@@ -265,7 +276,9 @@ def convert_array(text):
 def convert_header(text):
   hdu = pf.PrimaryHDU()
   for i in [eval(l) for l in eval(text)]:
-    if i[0]: hdu.header.append(i)
+    if i[0]: 
+      try: hdu.header.append(i)
+      except: pass
   return hdu.header
 
 sql.register_adapter(np.ndarray, adapt_array), sql.register_adapter(pf.header.Header, adapt_header)

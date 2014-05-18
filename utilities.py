@@ -180,8 +180,7 @@ def montecarlo(spectrum, modelDict, N=100, save=''):
     G.append(g)
   bests = [min(i) for i in zip(*G)]
   fits, teff, logg = zip(*bests)
-  result = marginalized_distribution([teff, logg, fits], save=save)
-  return result
+  return marginalized_distribution([teff, logg, fits], save=save)
 
 def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', exclude=[], replace=[], plot=False, Rlim=(0,100), title='', weighting=True, verbose=False, save=''):
   '''
@@ -272,10 +271,10 @@ def norm_spec(spectrum, template, exclude=[], include=[]):
   S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
   if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
   if include: S0, T0 = [[i[idx_include(j[0],include)] for i in j] for j in [S0,T0]]
-  try: norm = np.trapz(T0[1], x=T0[0])/np.trapz(np.interp(T0[0],*S0[:2]), x=T0[0])
+  try: norm = np.trapz(T0[1], x=T0[0])/np.trapz(rebin_spec(S0, T0[0])[1], x=T0[0])
   except ValueError: norm = 1            
-  S[1] = S[1]*norm                                                                              
-  try: S[2] = S[2]*norm                                                        
+  S[1] *= norm                                                                              
+  try: S[2] *= norm                                                        
   except IndexError: pass
   return S
 
@@ -295,7 +294,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[],
   
   (W, F, E), normalized = template, []
   if spectra:
-    for S in spectra: normalized.append(norm_spec([i.value if hasattr(i,'_unit') else i for i in unc(S, SNR=SNR)], [W,F,E], exclude=exclude+replace))
+    for S in spectra: normalized.append(norm_spec(S, [W,F,E], exclude=exclude+replace))
     if plot: 
       plt.loglog(W, F, alpha=0.5), plt.fill_between(W, F-E, F+E, alpha=0.1)
       for w,f,e in normalized: plt.loglog(w, f, alpha=0.5), plt.fill_between(w, f-e, f+e, alpha=0.2)
@@ -337,24 +336,27 @@ def pi2pc(parallax):
     return (d, sig_d)
   else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
 
-def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[]):
+def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], title=False):
   '''
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
   '''
   def red(t): print "\033[01;31m{0}\033[00m".format(t),
-  if not to_txt: print '\r'
-  values = [["-" if not i else "{:.6g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.6g} {}".format(i.value,i.unit) if hasattr(i,'unit') else i for i in j] for j in values]
-  auto, txtFile = [max([len(i)+(2 if ' ' in i else 0) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
+  # if not to_txt: print '\r'
+  values = [["-" if i=='' or i is None else "{:.6g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.6g} {}".format(i.value,i.unit) if hasattr(i,'unit') else i for i in j] for j in values]
+  auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
   lengths = format if isinstance(format,list) else [min(truncate,i) for i in auto]
   col_len = [max(auto) for i in lengths] if format=='max' else [150/len(labels) for i in lengths] if format=='fill' else lengths
+  if title:
+    if to_txt: txtFile.write(str(title))
+    else: print str(title)
   for l,m in zip(labels,col_len):
-    if to_txt: txtFile.write(("'"+str(l)[:truncate]+"'").ljust(m) if ' ' in str(l) else str(l)[:truncate].ljust(m))
+    if to_txt: txtFile.write(str(l)[:truncate].ljust(m) if ' ' in str(l) else str(l)[:truncate].ljust(m))
     else: print str(l)[:truncate].ljust(m),  
   for row_num,v in enumerate(values):
     if to_txt: txtFile.write('\n')
     else: print '\n',
     for col_num,(k,j) in enumerate(zip(v,col_len)):
-      if to_txt: txtFile.write(("'"+str(k)[:truncate]+"'").ljust(j) if ' ' in str(k) else str(k)[:truncate].ljust(j))
+      if to_txt: txtFile.write(str(k)[:truncate].ljust(j) if ' ' in str(k) else str(k)[:truncate].ljust(j))
       else:
         if (row_num,col_num) in highlight: red(str(k)[:truncate].ljust(j))
         else: print str(k)[:truncate].ljust(j),
@@ -409,7 +411,8 @@ def scrub(data):
   '''
   For input data [w,f,e] or [w,f] returns the list with NaN, negative, and zero flux (and corresponsing wavelengths and errors) removed. 
   '''
-  data = [i[np.where((data[1].value>0) & (~np.isnan(data[1].value)))] if hasattr(i,'_unit') else i[np.where((data[1]>0) & (~np.isnan(data[1])))] for i in data]
+  data = [i*q.Unit('') for i in data]
+  data = [i[np.where(np.logical_and(data[1].value>0,~np.isnan(data[1].value)))] for i in data]
   return [i[np.lexsort([data[0]])] for i in data]
 
 def smooth(x,beta):
