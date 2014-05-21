@@ -48,16 +48,17 @@ class get_db:
       unc = flx/snr if snrPath else np.array(data[2], dtype='float32')
     except: snr = unc = ''
     regime = 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
-    try:
-      h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
-      for n,i in enumerate(h): 
-        if len(i)==1: h.pop(n)
-        elif len(i)==2: h[n].append('')
-        elif len(i)>=4: h[n] = [h[n][0],h[n][1],' '.join(h[n][2:])] 
-      hdu = pf.PrimaryHDU()
-      for i in h: hdu.header.append(tuple(i))
-      header = hdu.header
-    except: header = ''
+    # try:
+    #   h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
+    #   for n,i in enumerate(h): 
+    #     if len(i)==1: h.pop(n)
+    #     elif len(i)==2: h[n].append('')
+    #     elif len(i)>=4: h[n] = [h[n][0],h[n][1],' '.join(h[n][2:])] 
+    #   hdu = pf.PrimaryHDU()
+    #   for i in h: hdu.header.append(tuple(i))
+    #   header = hdu.header
+    # except: 
+    header = None
     try:
       self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
@@ -154,7 +155,7 @@ class get_db:
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
     except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
     results = self.query.execute(q).fetchall()
-    if results: u.printer(['id','ra','dec','designation','unum','short','names'], results)
+    if results: u.printer(['id','ra','dec','designation','unum','short','names'], results, truncate=75)
     else: print "No objects found by {}".format(search)
       
   def inventory(self, ID='', unum='', verbose=False, with_pi=False, SED=False, plot=False, data=False):
