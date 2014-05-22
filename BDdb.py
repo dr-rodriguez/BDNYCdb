@@ -44,10 +44,11 @@ class get_db:
     filename, data = os.path.basename(asciiPath), zip(*u.txt2dict(asciiPath, to_list=True, skip=header_chars+skip))
     wavelength, flux = [np.array(i, dtype='float32') for i in data][start:start+2]
     try:
-      snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[1][1:], dtype='float32') if snrPath else ''
+      snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[-1][1:], dtype='float32') if snrPath else ''
       unc = flx/snr if snrPath else np.array(data[2], dtype='float32')
     except: snr = unc = ''
-    regime = 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
+    if wavelength[0]<100: regime = 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
+    else: regime = 'OPT' if wavelength[0]<8000 and wavelength[-1]<12000 else 'NIR' if wavelength[0]<12000 and wavelength[-1]>20000 else 'MIR' if wavelength[-1]>30000 else None
     # try:
     #   h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
     #   for n,i in enumerate(h): 
