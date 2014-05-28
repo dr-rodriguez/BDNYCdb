@@ -130,6 +130,11 @@ def goodness(spec1, spec2, array=False, exclude=[], filt_dict=None, weighting=Tr
   if verbose: plt.loglog(spec2[0], spec2[1]*C, 'r', label='spec2', alpha=0.6), plt.loglog(w1, f1, 'k', label='spec1', alpha=0.6), plt.loglog(w1, f2*C, 'b', label='spec2 binned', alpha=0.6), plt.grid(True), plt.legend(loc=0)
   return [G if array else sum(G), C]
 
+def group(lst, n):
+  for i in range(0, len(lst), n):
+    val = lst[i:i+n]
+    if len(val) == n: yield tuple(val)
+
 def idx_include(x, include):
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
   except TypeError:
@@ -172,11 +177,11 @@ def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', colo
   if save: plt.savefig(save)
   return [teff, teff_frac, logg, logg_frac]
 
-def montecarlo(spectrum, modelDict, N=100, save=''):
+def montecarlo(spectrum, modelDict, N=100, exclude=[], save=''):
   G = []
   for p in modelDict.keys():
     model, g = rebin_spec([modelDict[p]['wavelength'],modelDict[p]['flux']], spectrum[0]), []
-    for _ in itertools.repeat(None,N): g.append((goodness(spectrum, [model[0], model[1]*abs(np.random.normal(size=len(model[1]))), model[2]])[0], int(p.split()[0]), float(p.split()[1])))
+    for _ in itertools.repeat(None,N): g.append((goodness(spectrum, [model[0], model[1]*abs(np.random.normal(size=len(model[1]))), model[2]], exclude=exclude)[0], int(p.split()[0]), float(p.split()[1])))
     G.append(g)
   bests = [min(i) for i in zip(*G)]
   fits, teff, logg = zip(*bests)
@@ -206,10 +211,13 @@ def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', e
   # Generate uncertainty array from fits that fall within 1 sigma of best fit. 
   fits, dof = sorted(fit_list), len(photometry)/2 if phot_fit else len(spectrum[0])
   min_Chi = fits.pop([n for n,i in enumerate(fits) if fits[n][1]==fit][0] if fit in model_dict else 0)
-  one_sigs = [i for i in fits if (i[0]/min_Chi[0])<=1+(st.chi2.ppf(st.chi2.cdf(1,1),dof)/dof)]
-  for n,i in enumerate(one_sigs): one_sigs[n][5] = rebin_spec(one_sigs[n][5], min_Chi[5][0])[1] if len(one_sigs[n][5][1])!=len(min_Chi[5][1]) else one_sigs[n][5][1]
-  final_spec = [min_Chi[5][0]*q.um, min_Chi[5][1]*q.erg/q.s/q.cm**2/q.AA, np.maximum.reduce([np.array(map(abs,min_Chi[5][1]-i[5])) for i in one_sigs])*q.erg/q.s/q.cm**2/q.AA if one_sigs else abs(min_Chi[5][1]-(rebin_spec(fits[1][5], min_Chi[5][0])[1] if len(fits[1][5][1])!=len(min_Chi[5][1]) else fits[1][5][1]))*q.erg/q.s/q.cm**2/q.AA]
-  printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2', 'Lbol'], [[i[0], i[1], i[3] if dist else i[2], i[4]] for i in one_sigs])
+  # one_sigs = [i for i in fits if (i[0]/min_Chi[0])<=1+(st.chi2.ppf(st.chi2.cdf(1,1),dof)/dof)]
+  # for n,i in enumerate(one_sigs): one_sigs[n][5] = rebin_spec(one_sigs[n][5], min_Chi[5][0])[1] if len(one_sigs[n][5][1])!=len(min_Chi[5][1]) else one_sigs[n][5][1]
+  # final_spec = [min_Chi[5][0]*q.um, min_Chi[5][1]*q.erg/q.s/q.cm**2/q.AA, np.maximum.reduce([np.array(map(abs,min_Chi[5][1]-i[5])) for i in one_sigs])*q.erg/q.s/q.cm**2/q.AA if one_sigs else abs(min_Chi[5][1]-(rebin_spec(fits[1][5], min_Chi[5][0])[1] if len(fits[1][5][1])!=len(min_Chi[5][1]) else fits[1][5][1]))*q.erg/q.s/q.cm**2/q.AA]
+  # printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2', 'Lbol'], [[i[0], i[1], i[3] if dist else i[2], i[4]] for i in one_sigs])
+  mErr = np.empty(len(min_Chi[5][0]))
+  mErr.fill(np.sqrt(sum(np.array([photometry[i] for i in photometry if 'unc' in i and photometry[i]])**2)))
+  final_spec = [min_Chi[5][0]*q.um, min_Chi[5][1]*q.erg/q.s/q.cm**2/q.AA, mErr*q.erg/q.s/q.cm**2/q.AA]
 
   if plot:
     # for i in one_sigs: plt.loglog(final_spec[0][::40], i[5][::40], color='0.5', alpha=0.5)
@@ -413,6 +421,7 @@ def scrub(data):
   '''
   data = [i*q.Unit('') for i in data]
   data = [i[np.where(np.logical_and(data[1].value>0,~np.isnan(data[1].value)))] for i in data]
+  data = [i[np.unique(i, return_index=True)[1]] for i in data]
   return [i[np.lexsort([data[0]])] for i in data]
 
 def smooth(x,beta):
