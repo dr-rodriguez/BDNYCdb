@@ -17,7 +17,7 @@ def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
   '''
   lam, T = lam.to(q.cm), T*q.K
   I = np.pi*(2*ac.h*ac.c**2 / (lam**(4 if Flam else 5) * (np.exp((ac.h*ac.c / (lam*ac.k_B*T)).decompose()) - 1))).to(q.erg/q.s/q.cm**2/(1 if Flam else q.AA))
-  return I if emitted else I*((radius*ac.R_jup)**2/(dist*q.pc)**2).decompose()
+  return I if emitted else I*((ac.R_jup*radius/(dist*q.pc))**2).decompose()
 
 def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet):
   xi, yi = np.meshgrid(np.linspace(min(x), max(x), 500), np.linspace(min(y), max(y), 25))
@@ -421,7 +421,7 @@ def scrub(data):
   '''
   data = [i*q.Unit('') for i in data]
   data = [i[np.where(np.logical_and(data[1].value>0,~np.isnan(data[1].value)))] for i in data]
-  data = [i[np.unique(i, return_index=True)[1]] for i in data]
+  data = [i[np.unique(data[0], return_index=True)[1]] for i in data]
   return [i[np.lexsort([data[0]])] for i in data]
 
 def smooth(x,beta):
