@@ -290,7 +290,7 @@ def load_log():
 # ==============================================================================================================================================
 
 def load_marley_spectra():
-  syn, files, models = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/model_atmospheres.db'), glob.glob(path+'Models/Marley Models/sp_t*'), []
+  syn, files, models = BDdb.get_db(path+'Models/model_atmospheres.db'), glob.glob(path+'Models/Marley-Saumon/sp_t*'), []
   syn.query.execute("DROP TABLE IF EXISTS marley_saumon"), syn.query.execute("CREATE TABLE marley_saumon (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, f_sed INTEGER, k_zz REAL, wavelength ARRAY, flux ARRAY)")    
 
   def read_model(filepath):
@@ -307,7 +307,7 @@ def load_marley_spectra():
   syn.modify.close()
 
 def load_bt_settl_spectra(year=2013):
-  syn, files, bt_settl = BDdb.get_db('/Users/Joe/Dropbox/BDNYCdb/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0_{}/*.spec.7'.format(year)), []
+  syn, files, bt_settl = BDdb.get_db(path+'Models/model_atmospheres.db'), glob.glob(path+'Models/BT-Settl_M-0.0_a+0.0_{}/*.spec.7'.format(year)), []
   syn.query.execute("DROP TABLE IF EXISTS bt_settl_{}".format(year)), syn.query.execute("CREATE TABLE bt_settl_{} (id INTEGER PRIMARY KEY, teff INTEGER, logg REAL, wavelength ARRAY, flux ARRAY)".format(year))    
   
   def read_btsettl(filepath):
