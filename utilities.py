@@ -9,7 +9,10 @@ from pysynphot import spectrum
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
-def app2abs(mag, dist, sig_m='', sig_d='', flux=False): return (mag*10*q.pc/dist, 10*q.pc*np.sqrt((sig_m/dist)**2 + (sig_d*mag/dist**2)**2)*mag.unit/dist.unit if sig_m and sig_d else '') if flux else (mag-5*np.log10(dist/(10*q.pc)), np.sqrt(sig_m**2 + 25*(sig_d/dist).value**2) if sig_m and sig_d else '')
+def app2abs(mag, dist, sig_m='', sig_d='', flux=False):
+  if isinstance(mag,(float,int)): return (mag*10*q.pc/dist, 10*q.pc*np.sqrt((sig_m/dist)**2 + (sig_d*mag/dist**2)**2)*mag.unit/dist.unit if sig_m and sig_d else '') if flux else (mag-5*np.log10(dist/(10*q.pc)), np.sqrt(sig_m**2 + 25*(sig_d/dist).value**2) if sig_m and sig_d else '')
+  elif hasattr(mag,'unit'): return (mag*10*q.pc/dist).to(mag.unit), (10*q.pc*np.sqrt((sig_m**2 + (sig_d*mag/dist)**2).to(mag.unit**2))*mag.unit/dist).to(mag.unit) if sig_m!='' and sig_d else ''
+  else: print 'Could not absolutely flux calibrate that input.'
   
 def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
   '''
@@ -34,7 +37,7 @@ def deg2sxg(ra='', dec=''):
   if dec: DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')) 
   return (RA, DEC) if ra and dec else RA or DEC 
   
-def dict2txt(DICT, writefile, column1='-', delim='\t', digits=6, order='', append=False):
+def dict2txt(DICT, writefile, column1='-', delim='\t', digits=6, order='', empties=False, append=False):
   '''
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
   '''
@@ -148,16 +151,20 @@ def idx_exclude(x, exclude):
     try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
     except TypeError: return range(len(x))
 
-def mag2flux(band, mag, sig_m='', Flam=False, photon=False):
+def mag2flux(band, mag, sig_m='', photon=False):
   '''
-  For given band and magnitude, returns the flux value in [ergs][s-1][cm-2][cm-1]
-  Note: Must be multiplied by wavelength in [cm] to be converted to [ergs][s-1][cm-2], not done here! 
+  For given band and magnitude, returns the flux value in [ergs][s-1][cm-2][A-1]
   mag = -2.5*log10(F/zp)  =>  flux = zp*10**(-mag/2.5)
   '''
   f = (a.filter_info(band)['zp_photon' if photon else 'zp']*(1 if photon else q.erg)/q.s/q.cm**2/q.AA*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/q.AA)
   sig_f = f*sig_m*np.log(10)/2.5 if sig_m else ''
   return (f, sig_f)
   
+def flux2mag(band, flux, sig_f='', photon=True): 
+  F = -2.5*np.log10(flux/a.filter_info(band)['zp_photon' if photon else 'zp'])
+  sig_F = (2.5/np.log(10))*(sig_f/F).value if sig_f else ''  
+  return (F,sig_F)
+
 def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
   else:
@@ -188,40 +195,30 @@ def montecarlo(spectrum, modelDict, N=100, exclude=[], save=''):
   fits, teff, logg = zip(*bests)
   return marginalized_distribution([teff, logg, fits], save=save)
 
-def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', exclude=[], replace=[], plot=False, Rlim=(0,100), title='', weighting=True, verbose=False, save=''):
+def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, d='', sig_d='', exclude=[], plot=False, Rlim=(0,100), Tlim=(700,3000), title='', weighting=True, verbose=False, save=''):
   '''
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  fit_list, unfit_list, phot_fit, model_dict = [], [], True if fit=='phot' else False, photDict if fit=='phot' else specDict if fit=='spec' else {fit: specDict[fit]}
   for b in photometry.keys():
     if 'unc' not in b:
       if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
   
-  f_spec = (np.trapz(spectrum[1], x=spectrum[0]) - (np.trapz(spectrum[1][idx_include(spectrum[0],replace)], x=spectrum[0][idx_include(spectrum[0],replace)]) if replace else 0))*q.um*q.erg/q.s/q.cm**2/q.AA
-  
-  for k in model_dict.keys():
+  fit_list, unfit_list, phot_fit = [], [], False
+  for k in specDict:
     try:
       w, f = specDict[k]['wavelength'], specDict[k]['flux'] 
       good, const = goodness(photometry if phot_fit else spectrum, model_dict[k] if phot_fit else rebin_spec([specDict[k]['wavelength'],specDict[k]['flux']], spectrum[0], waveunits='um'), filt_dict=filtDict, exclude=exclude, weighting=weighting)
-      radius, f = (dist*np.sqrt(float(const))/ac.R_jup).decompose().value, f*const
-      f_model = (np.trapz(f[w<spectrum[0][0].value], x=w[w<spectrum[0][0].value]) + np.trapz(f[w>spectrum[0][-1].value], x=w[w>spectrum[0][-1].value]) + np.trapz(f[idx_include(w,replace)], x=w[idx_include(w,replace)]))*q.um*q.erg/q.s/q.cm**2/q.AA
-      lbol = np.log10((4*np.pi*(f_spec+f_model)*(10*q.pc)**2).to(q.erg/q.s)/ac.L_sun.to(q.erg/q.s))
-      if radius>Rlim[0] and radius<Rlim[1]: fit_list.append([abs(good), k, float(const), radius, lbol, [w,f]])
-      else: unfit_list.append([abs(good), k, float(const), radius, lbol, [w,f]])
+      R, sig_R = (d*np.sqrt(float(const))/ac.R_jup).decompose().value, (sig_d*np.sqrt(float(const))/ac.R_jup).decompose().value if sig_d else ''
+      if R>Rlim[0] and R<Rlim[1]: fit_list.append([abs(good), k, float(const), R, sig_R, None, [w,f*const]])
+      else: unfit_list.append([abs(good), k, float(const), R, sig_R, None, [w,f*const]])
     except: pass
-      
-  # Generate uncertainty array from fits that fall within 1 sigma of best fit. 
-  fits, dof = sorted(fit_list), len(photometry)/2 if phot_fit else len(spectrum[0])
-  min_Chi = fits.pop([n for n,i in enumerate(fits) if fits[n][1]==fit][0] if fit in model_dict else 0)
-  mErr = np.empty(len(min_Chi[5][0]))
-  mErr.fill(np.sqrt(sum(np.array([photometry[i] for i in photometry if 'unc' in i and photometry[i]])**2)))
-  final_spec = [min_Chi[5][0]*q.um, min_Chi[5][1]*q.erg/q.s/q.cm**2/q.AA, mErr*q.erg/q.s/q.cm**2/q.AA]
+  
+  best = sorted(fit_list)[0]
+  best_unc = np.empty(len(best[-1][0]))
+  best_unc.fill(np.sqrt(sum(np.array([photometry[i] for i in photometry if 'unc' in i and photometry[i]])**2)))
+  final_spec = [best[-1][0]*q.um, best[-1][1]*q.erg/q.s/q.cm**2/q.AA, best_unc*q.erg/q.s/q.cm**2/q.AA]
 
   if plot:
-    # for i in one_sigs: plt.loglog(final_spec[0][::40], i[5][::40], color='0.5', alpha=0.5)
-    # plt.loglog(final_spec[0][::40], final_spec[1][::40], c='k', lw=2, alpha=0.7), plt.fill_between(final_spec[0][::40], final_spec[1][::40]-final_spec[2][::40], final_spec[1][::40]+final_spec[2][::40], color='k', alpha=0.3)
-    # plt.loglog(spectrum[0], spectrum[1], c='b', alpha=0.7), plt.fill_between(spectrum[0], spectrum[1]-spectrum[2], spectrum[1]+spectrum[2], color='b', alpha=0.3)
-    # plt.yscale('log', nonposy='clip')
     from itertools import groupby
     fig, to_print = plt.figure(), []
     for (ni,li) in [('fl',fit_list),('ul',unfit_list)]:
@@ -232,7 +229,7 @@ def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', e
     plt.legend(loc=0), plt.grid(True), plt.yscale('log'), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff'), plt.suptitle(plot) 
     if save: plt.savefig(save+' - fit plot.png')#, printer(['Params','G','radius','Lbol'], to_print, to_txt=save+' - fit.txt')
 
-  return [final_spec, min_Chi[1], min_Chi[2], min_Chi[3], min_Chi[4]]
+  return [final_spec, best[1], best[2], best[3], best[4], best[5]]
 
 def modelInterp(params, model_dict, filt_dict=None, plot=False):
   '''
@@ -272,8 +269,8 @@ def norm_spec(spectrum, template, exclude=[], include=[]):
   '''
   Returns *spectrum* with [W,F] or [W,F,E] normalized to *template* [W,F] or [W,F,E].
   Wavelength range tuples provided in *exclude* argument are ignored during normalization, i.e. exclude=[(0.65,0.72),(0.92,0.97)].
-  '''                                                          
-  S, T = scrub([i.value if hasattr(i,'_unit') else i for i in spectrum]), scrub([i.value if hasattr(i,'_unit') else i for i in template])
+  '''              
+  S, T = scrub(spectrum), scrub(template)
   S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
   if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
   if include: S0, T0 = [[i[idx_include(j[0],include)] for i in j] for j in [S0,T0]]
@@ -292,7 +289,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[],
   if not template: 
     spectra = [scrub(i) for i in sorted(spectra, key=lambda x: x[1][-1])]
     template = spectra.pop()
-                                                                                    
+        
   if trim:
     all_spec = [template]+spectra
     for n,x1,x2 in trim: all_spec[n] = [i[idx_exclude(all_spec[n][0],[(x1,x2)])] for i in all_spec[n]]
@@ -348,7 +345,7 @@ def polynomial(n, m, sig='', degree=1, c='k', ls='-'):
   w = np.linspace(min(n), max(n), 50)
   plt.plot(w, f(w), c=c, ls='-') # label='{} = {}'.format(y,' '.join(['- {}{}'.format(i[1:5],'${}^{}$'.format(x,str(len(p)-n-1)) if n!=len(p)-1 else '') if '-' in i else '+ {}{}'.format(i[:4],'${}^{}$'.format(x,str(len(p)-n-1)) if n!=len(p)-1 else '') for n,i in enumerate(map(str,p))])))
 
-def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], title=False):
+def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], skip=[], empties=False, title=False):
   '''
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
   '''
@@ -358,20 +355,30 @@ def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], 
   auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
   lengths = format if isinstance(format,list) else [min(truncate,i) for i in auto]
   col_len = [max(auto) for i in lengths] if format=='max' else [150/len(labels) for i in lengths] if format=='fill' else lengths
+  
+  # If False, remove columns with no values
+  if not empties:
+    for n,col in enumerate(labels):
+      if all([i[n]=='-' for i in values]):
+        labels.pop(n)
+        for i in values: i.pop(n)
+  
   if title:
     if to_txt: txtFile.write(str(title))
     else: print str(title)
-  for l,m in zip(labels,col_len):
-    if to_txt: txtFile.write(str(l)[:truncate].ljust(m) if ' ' in str(l) else str(l)[:truncate].ljust(m))
-    else: print str(l)[:truncate].ljust(m),  
+  for N,(l,m) in enumerate(zip(labels,col_len)):
+    if N not in skip:
+      if to_txt: txtFile.write(str(l)[:truncate].ljust(m) if ' ' in str(l) else str(l)[:truncate].ljust(m))
+      else: print str(l)[:truncate].ljust(m),  
   for row_num,v in enumerate(values):
     if to_txt: txtFile.write('\n')
     else: print '\n',
     for col_num,(k,j) in enumerate(zip(v,col_len)):
-      if to_txt: txtFile.write(str(k)[:truncate].ljust(j) if ' ' in str(k) else str(k)[:truncate].ljust(j))
-      else:
-        if (row_num,col_num) in highlight: red(str(k)[:truncate].ljust(j))
-        else: print str(k)[:truncate].ljust(j),
+      if col_num not in skip:
+        if to_txt: txtFile.write(str(k)[:truncate].ljust(j) if ' ' in str(k) else str(k)[:truncate].ljust(j))
+        else:
+          if (row_num,col_num) in highlight: red(str(k)[:truncate].ljust(j))
+          else: print str(k)[:truncate].ljust(j),
   if not to_txt: print '\n'
 
 def rebin_spec(spec, wavnew, waveunits='um'):
@@ -437,6 +444,21 @@ def smooth(x,beta):
   w = np.kaiser(window_len,beta)
   y = np.convolve(w/w.sum(), s, mode='valid')
   return y[5:len(y)-5]*(x.unit if hasattr(x, 'unit') else 1)
+  
+def specType(SpT):
+  '''
+  (By Joe Filippazzo)
+
+  Converts between float and letter/number M, L, T and Y spectral types (e.g. 14.5 => 'L4.5' and 'T3' => 23).
+
+  *SpT*
+    Float spectral type between 0.0 and 39.9 or letter/number spectral type between M0.0 and Y9.9
+  '''
+  if isinstance(SpT,str) and SpT[0] in ['M','L','T','Y'] and float(SpT[1:]) < 10:
+    try: return [l+float(SpT[1:]) for m,l in zip(['M','L','T','Y'],[0,10,20,30]) if m == SpT[0]][0]
+    except ValueError: print "Spectral type must be a float between 0 and 40 or a string of class M, L, T or Y."
+  elif isinstance(SpT,float) or isinstance(SpT,int) and 0.0 <= SpT < 40.0: return '{}{}'.format('MLTY'[int(SpT//10)], SpT % 10.)
+  else: return SpT
   
 def str2Q(x,target=''):
   '''
@@ -533,7 +555,7 @@ def unc(spectrum, SNR=20):
   if len(S)==3:
     try: S[2] = np.array([i/SNR if np.isnan(j) else j for i,j in zip(S[1],S[2])], dtype='float32')*(S[1].unit if hasattr(S[1],'unit') else 1)
     except TypeError: S[2] = np.array(S[1]/SNR)
-  elif len(S)==2: S.append(np.array(S[1]/SNR))
+  elif len(S)==2: S.append(S[1]/SNR)
   return S
 
 def xl2dict(filepath, sheet=1, obj_col=0, key_row=0, start=1, manual_keys=''):

@@ -17,25 +17,34 @@ class get_db:
       self.dict.row_factory = sql.Row
     else: print "Sorry, no such file '{}'".format(dbpath)
         
-  def add_data(self, CSV, table):
+  def add_data(self, CSV, table, multiband=False):
     '''
     Adds data in **CSV** file to the specified database **table**. Note column names (row 1 of CSV file) must match table fields to insert, however order and completeness don't matter.
-    '''    
-    data, (columns, types) = u.txt2dict(CSV, all_str=True, delim=',', to_list=True), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3]
-    data_columns, insert, update = data.pop(0), [], []
-    for row in data:
-      values = [None for i in columns]
-      for col in columns: values[columns.index(col)] = row[data_columns.index(col)] if col in data_columns and row[data_columns.index(col)] else None
-      update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
+    '''   
+    data, (columns, types), insert, update = u.txt2dict(CSV, all_str=True, delim=',', to_list=False if multiband and table=='photometry' else True, start=0), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], [], []
+    if multiband and table=='photometry':
+      bands = u.get_filters().keys()
+      for row in data.keys():
+        for i in bands:
+          if all([k in data[row].keys() for k in [i,i+'_unc']]):
+            values = [data[row].get(col,None) for col in columns]
+            values[columns.index('magnitude')], values[columns.index('magnitude_unc')], values[columns.index('band')], values[columns.index('source_id')] = data[row].get(i), data[row].get(i+'_unc'), i, row
+            if values[1].isdigit(): update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
+    else:
+      data_columns = data.pop(0)
+      for row in data:
+        values = [None for i in columns]
+        for col in columns: values[columns.index(col)] = row[data_columns.index(col)] if col in data_columns and row[data_columns.index(col)] else None
+        update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
     if insert:
-      u.printer(columns, insert, truncate=30), self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), insert), self.modify.commit()
+      u.printer(columns, insert, truncate=30, empties=True), self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), insert), self.modify.commit()
       print "{} new records added to the {} table.".format(len(insert),table.upper())
     if update:
       u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keeps both records and assigns second one new id if necessary'],['r','Replaces all columns of first record with second record values'],['r [column name] [column name]...','Replaces specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['quit','Quit and return to command line']])
       for item in update:
         record = self.query.execute("SELECT * FROM {} WHERE id={}".format(table, item[columns.index('id')])).fetchone()
         if record: compare_records(self, table, columns, record, item)
-    self.clean_up(table)
+    # self.clean_up(table)
    
   def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], skip=[], start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''): 
     '''
@@ -58,10 +67,10 @@ class get_db:
       hdu = pf.PrimaryHDU()
       for i in h: hdu.header.append(tuple(i))
       header = hdu.header
-    except: header = None
+    except: header = pf.PrimaryHDU().header
     try:
       self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
-      u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
+      u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]], empties=True)
       self.clean_up('spectra')
     except: 
       print "Couldn't add spectrum to database."
@@ -174,7 +183,7 @@ class get_db:
     try:
       D = self.query.execute(q).fetchall()
       if D:
-        u.printer(['id','unum','name','ra','dec','Spec Count','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR','grav'], D)
+        u.printer(['id','unum','name','ra','dec','Spec Count','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR','grav'], D, empties=True)
         if plot:
           for I in IDS:
             for i in self.dict.execute("SELECT * FROM spectra WHERE source_id={}".format(I)).fetchall(): self.plot_spectrum(i['id'])
@@ -187,7 +196,7 @@ class get_db:
         if 'source_id' in columns:
           data = map(list, self.query.execute("SELECT * FROM {} WHERE source_id={}".format(table,ID)).fetchall())
           for d in data+[columns,types]: d.pop(1)
-          if data: u.printer([c.replace('wavelength_units','units').replace('flux_units','units').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('wavelength','wav').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=15 if table=='spectra' else 50, title=table.upper())
+          if data: u.printer([c.replace('wavelength_units','units').replace('flux_units','units').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('wavelength','wav').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=15 if table=='spectra' else 50, title=table.upper(), empties=True)
 
   def header(self, spectrum_id_or_path):
     '''
@@ -257,6 +266,14 @@ class get_db:
       u.dict2txt({str(w):{'flux [{}]'.format(data['flux_units']):str(f), 'unc [{}]'.format(data['flux_units']):str(e)} for w,f,e in zip(data['wavelength'],data['flux'],data['unc'])}, fn, column1='# wavelength [{}]'.format(data['wavelength_units']), append=True)
     else: print "No spectrum found with id {}".format(spectrum_id)
   
+  def publications(self, name=''): return self.query.execute("SELECT * FROM publications WHERE shortname LIKE '%{}%'".format(name)).fetchall()
+    
+  def telescopes(self, name=''): return self.query.execute("SELECT * FROM telescopes WHERE name LIKE '%{}%'".format(name)).fetchall()
+
+  def instruments(self, name=''): return self.query.execute("SELECT * FROM instruments WHERE name LIKE '%{}%'".format(name)).fetchall()
+
+  def systems(self, name=''): return self.query.execute("SELECT * FROM systems WHERE name LIKE '%{}%'".format(name)).fetchall()
+    
   def fix_publications(self):
     '''
     Runs through all tables and changes publication shortname (i.e. Rice10) to correct publication_id. If that shortname is not in the publications table, it assigns a new publication_id.
