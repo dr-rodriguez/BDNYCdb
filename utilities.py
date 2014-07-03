@@ -17,7 +17,7 @@ def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
   '''
   lam, T = lam.to(q.cm), T*q.K
   I = np.pi*(2*ac.h*ac.c**2 / (lam**(4 if Flam else 5) * (np.exp((ac.h*ac.c / (lam*ac.k_B*T)).decompose()) - 1))).to(q.erg/q.s/q.cm**2/(1 if Flam else q.AA))
-  return I if emitted else I*((radius*ac.R_jup)**2/(dist*q.pc)**2).decompose()
+  return I if emitted else I*((ac.R_jup*radius/(dist*q.pc))**2).decompose()
 
 def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet):
   xi, yi = np.meshgrid(np.linspace(min(x), max(x), 500), np.linspace(min(y), max(y), 25))
@@ -34,7 +34,7 @@ def deg2sxg(ra='', dec=''):
   if dec: DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')) 
   return (RA, DEC) if ra and dec else RA or DEC 
   
-def dict2txt(DICT, writefile, column1='-', delim='\t', digits=None, order='', append=False):
+def dict2txt(DICT, writefile, column1='-', delim='\t', digits=6, order='', append=False):
   '''
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
   '''
@@ -45,6 +45,7 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits=None, order='', ap
     for k in D.keys():
       w.append(k)
       for i in D[k].keys():
+        if hasattr(D[k][i],'unit'): D[k][i] = D[k][i].value
         if digits: D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
         else: D[k][i] = '-' if not D[k][i] else '{}'.format(D[k][i]) if isinstance(D[k][i],(float,int)) else '{}'.format(float(D[k][i])) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
         w.append(i), w.append(str(D[k][i]))
@@ -130,6 +131,11 @@ def goodness(spec1, spec2, array=False, exclude=[], filt_dict=None, weighting=Tr
   if verbose: plt.loglog(spec2[0], spec2[1]*C, 'r', label='spec2', alpha=0.6), plt.loglog(w1, f1, 'k', label='spec1', alpha=0.6), plt.loglog(w1, f2*C, 'b', label='spec2 binned', alpha=0.6), plt.grid(True), plt.legend(loc=0)
   return [G if array else sum(G), C]
 
+def group(lst, n):
+  for i in range(0, len(lst), n):
+    val = lst[i:i+n]
+    if len(val) == n: yield tuple(val)
+
 def idx_include(x, include):
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
   except TypeError:
@@ -172,11 +178,11 @@ def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', colo
   if save: plt.savefig(save)
   return [teff, teff_frac, logg, logg_frac]
 
-def montecarlo(spectrum, modelDict, N=100, save=''):
+def montecarlo(spectrum, modelDict, N=100, exclude=[], save=''):
   G = []
   for p in modelDict.keys():
     model, g = rebin_spec([modelDict[p]['wavelength'],modelDict[p]['flux']], spectrum[0]), []
-    for _ in itertools.repeat(None,N): g.append((goodness(spectrum, [model[0], model[1]*abs(np.random.normal(size=len(model[1]))), model[2]])[0], int(p.split()[0]), float(p.split()[1])))
+    for _ in itertools.repeat(None,N): g.append((goodness(spectrum, [model[0], model[1]*abs(np.random.normal(size=len(model[1]))), model[2]], exclude=exclude)[0], int(p.split()[0]), float(p.split()[1])))
     G.append(g)
   bests = [min(i) for i in zip(*G)]
   fits, teff, logg = zip(*bests)
@@ -186,12 +192,13 @@ def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', e
   '''
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
   '''
-  fit_list, unfit_list, phot_fit, model_dict = [], [], True if fit=='phot' else False, photDict if fit=='phot' else specDict
+  fit_list, unfit_list, phot_fit, model_dict = [], [], True if fit=='phot' else False, photDict if fit=='phot' else specDict if fit=='spec' else {fit: specDict[fit]}
   for b in photometry.keys():
     if 'unc' not in b:
       if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
   
   f_spec = (np.trapz(spectrum[1], x=spectrum[0]) - (np.trapz(spectrum[1][idx_include(spectrum[0],replace)], x=spectrum[0][idx_include(spectrum[0],replace)]) if replace else 0))*q.um*q.erg/q.s/q.cm**2/q.AA
+  
   for k in model_dict.keys():
     try:
       w, f = specDict[k]['wavelength'], specDict[k]['flux'] 
@@ -206,10 +213,9 @@ def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, dist='', e
   # Generate uncertainty array from fits that fall within 1 sigma of best fit. 
   fits, dof = sorted(fit_list), len(photometry)/2 if phot_fit else len(spectrum[0])
   min_Chi = fits.pop([n for n,i in enumerate(fits) if fits[n][1]==fit][0] if fit in model_dict else 0)
-  one_sigs = [i for i in fits if (i[0]/min_Chi[0])<=1+(st.chi2.ppf(st.chi2.cdf(1,1),dof)/dof)]
-  for n,i in enumerate(one_sigs): one_sigs[n][5] = rebin_spec(one_sigs[n][5], min_Chi[5][0])[1] if len(one_sigs[n][5][1])!=len(min_Chi[5][1]) else one_sigs[n][5][1]
-  final_spec = [min_Chi[5][0]*q.um, min_Chi[5][1]*q.erg/q.s/q.cm**2/q.AA, np.maximum.reduce([np.array(map(abs,min_Chi[5][1]-i[5])) for i in one_sigs])*q.erg/q.s/q.cm**2/q.AA if one_sigs else abs(min_Chi[5][1]-(rebin_spec(fits[1][5], min_Chi[5][0])[1] if len(fits[1][5][1])!=len(min_Chi[5][1]) else fits[1][5][1]))*q.erg/q.s/q.cm**2/q.AA]
-  printer(['Goodness','Parameters','Radius' if dist else '(R/d)**2', 'Lbol'], [[i[0], i[1], i[3] if dist else i[2], i[4]] for i in one_sigs])
+  mErr = np.empty(len(min_Chi[5][0]))
+  mErr.fill(np.sqrt(sum(np.array([photometry[i] for i in photometry if 'unc' in i and photometry[i]])**2)))
+  final_spec = [min_Chi[5][0]*q.um, min_Chi[5][1]*q.erg/q.s/q.cm**2/q.AA, mErr*q.erg/q.s/q.cm**2/q.AA]
 
   if plot:
     # for i in one_sigs: plt.loglog(final_spec[0][::40], i[5][::40], color='0.5', alpha=0.5)
@@ -284,15 +290,15 @@ def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[],
   Returns one normalized, composite spectrum if *composite*, else returns the list of *spectra* normalized to the *template*.
   '''
   if not template: 
-    spectra = [unc(i, SNR=SNR) for i in sorted(spectra, key=lambda x: x[1][-1])]
+    spectra = [scrub(i) for i in sorted(spectra, key=lambda x: x[1][-1])]
     template = spectra.pop()
                                                                                     
   if trim:
     all_spec = [template]+spectra
     for n,x1,x2 in trim: all_spec[n] = [i[idx_exclude(all_spec[n][0],[(x1,x2)])] for i in all_spec[n]]
-    template, spectra = all_spec[0], all_spec[1:]
+    template, spectra = all_spec[0], all_spec[1:] if len(all_spec)>1 else None
   
-  (W, F, E), normalized = template, []
+  (W, F, E), normalized = scrub(template), []
   if spectra:
     for S in spectra: normalized.append(norm_spec(S, [W,F,E], exclude=exclude+replace))
     if plot: 
@@ -314,7 +320,7 @@ def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[],
             f_mean, e_mean = np.array([np.average([fl,FL], weights=[1/er,1/ER]) for fl,er,FL,ER in zip(f0,e0,F0,E0)]), np.sqrt(e0**2 + E0**2)            
             spec1, spec2 = min([W,F,E], [w,f,e], key=lambda x: x[0][0]), max([W,F,E], [w,f,e], key=lambda x: x[0][-1])
             spec1, spec2 = [i[np.where(spec1[0]<W0[0])[0]] for i in spec1], [i[np.where(spec2[0]>W0[-1])[0]] for i in spec2]
-            W, F, E = [np.concatenate([i,j,k]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
+            W, F, E = [np.concatenate([i[:-1],j[1:-1],k[1:]]) for i,j,k in zip(spec1,[W0,f_mean,e_mean],spec2)]
             tries = 5
             normalized.pop(n)
 
@@ -324,9 +330,9 @@ def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[],
       if composite: plt.loglog(W, F, '--', c='k', lw=1), plt.fill_between(W, F-E, F+E, color='k', alpha=0.2)
       plt.yscale('log', nonposy='clip')
 
-    if not composite: normalized.insert(0, unc(scrub(template), SNR=SNR))
+    if not composite: normalized.insert(0, template)
     else: normalized = [[W,F,E]]
-    return normalized[0][:len(template)] if composite else [i[:len(template)] for i in normalized]
+    return normalized[0][:len(template)] if composite else normalized
   else: return [W,F,E]
 
 def pi2pc(parallax): 
@@ -335,6 +341,12 @@ def pi2pc(parallax):
     d, sig_d = (1*q.pc*q.arcsec)/pi, sig_pi*q.pc*q.arcsec/pi**2
     return (d, sig_d)
   else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
+
+def polynomial(n, m, sig='', degree=1, c='k', ls='-'):
+  p = np.polyfit(np.array(map(float,n)), np.array(map(float,m)), degree, w=1/np.array([i if i else 1 for i in sig]) if sig!='' else None)
+  f = np.poly1d(p)
+  w = np.linspace(min(n), max(n), 50)
+  plt.plot(w, f(w), c=c, ls='-') # label='{} = {}'.format(y,' '.join(['- {}{}'.format(i[1:5],'${}^{}$'.format(x,str(len(p)-n-1)) if n!=len(p)-1 else '') if '-' in i else '+ {}{}'.format(i[:4],'${}^{}$'.format(x,str(len(p)-n-1)) if n!=len(p)-1 else '') for n,i in enumerate(map(str,p))])))
 
 def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], title=False):
   '''
@@ -413,6 +425,7 @@ def scrub(data):
   '''
   data = [i*q.Unit('') for i in data]
   data = [i[np.where(np.logical_and(data[1].value>0,~np.isnan(data[1].value)))] for i in data]
+  data = [i[np.unique(data[0], return_index=True)[1]] for i in data]
   return [i[np.lexsort([data[0]])] for i in data]
 
 def smooth(x,beta):
@@ -511,14 +524,14 @@ def try_except(success, failure, exceptions):
   except exceptions or Exception:
     return failure() if callable(failure) else failure      
 
-def unc(spectrum, SNR=50):
+def unc(spectrum, SNR=20):
   '''
   Removes NaNs negatives and zeroes from *spectrum* arrays of form [W,F] or [W,F,E].
   Generates E at signal to noise *SNR* for [W,F] and replaces NaNs with the same for [W,F,E]. 
   '''
-  S = scrub([i for i in spectrum if isinstance(i,np.ndarray)])
+  S = scrub(spectrum)
   if len(S)==3:
-    try: S[2] = np.array([i/SNR if np.isnan(j) else j for i,j in zip(S[1],S[2])], dtype='float32')
+    try: S[2] = np.array([i/SNR if np.isnan(j) else j for i,j in zip(S[1],S[2])], dtype='float32')*(S[1].unit if hasattr(S[1],'unit') else 1)
     except TypeError: S[2] = np.array(S[1]/SNR)
   elif len(S)==2: S.append(np.array(S[1]/SNR))
   return S

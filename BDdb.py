@@ -49,17 +49,16 @@ class get_db:
     except: snr = unc = ''
     if wavelength[0]<100: regime = 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
     else: regime = 'OPT' if wavelength[0]<8000 and wavelength[-1]<12000 else 'NIR' if wavelength[0]<12000 and wavelength[-1]>20000 else 'MIR' if wavelength[-1]>30000 else None
-    # try:
-    #   h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
-    #   for n,i in enumerate(h): 
-    #     if len(i)==1: h.pop(n)
-    #     elif len(i)==2: h[n].append('')
-    #     elif len(i)>=4: h[n] = [h[n][0],h[n][1],' '.join(h[n][2:])] 
-    #   hdu = pf.PrimaryHDU()
-    #   for i in h: hdu.header.append(tuple(i))
-    #   header = hdu.header
-    # except: 
-    header = None
+    try:
+      h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
+      for n,i in enumerate(h): 
+        if len(i)==1: h.pop(n)
+        elif len(i)==2: h[n].append('')
+        elif len(i)>=4: h[n] = [h[n][0],h[n][1],' '.join(h[n][2:])] 
+      hdu = pf.PrimaryHDU()
+      for i in h: hdu.header.append(tuple(i))
+      header = hdu.header
+    except: header = None
     try:
       self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]])
@@ -99,8 +98,8 @@ class get_db:
           except KeyError: obs_date = ''
     if not telescope_id:
       try:
-        n = header['TELESCOP'].lower()
-        telescope_id = 5 if 'hst' in n else 6 if 'spitzer' in n else 7 if 'irtf' in n else 9 if 'keck' in n and 'ii' in n else 8 if 'keck' in n and 'i' in n else 10 if 'kp' in n and '4' in n else 11 if 'kp' in n and '2' in n else 12 if 'bok' in n else 13 if 'mmt' in n else 14 if 'ctio' in n and '1' in n else 15 if 'ctio' in n and '4' in n else 16 if 'gemini' in n and 'north' in n else 17 if 'gemini' in n and 'south' in n else 18 if 'vlt' in n else 19 if '3.5m' in n else 20 if 'subaru' in n else 0
+        n = header['TELESCOP'].lower() if isinstance(header['TELESCOP'],str) else ''
+        telescope_id = 5 if 'hst' in n else 6 if 'spitzer' in n else 7 if 'irtf' in n else 9 if 'keck' in n and 'ii' in n else 8 if 'keck' in n and 'i' in n else 10 if 'kp' in n and '4' in n else 11 if 'kp' in n and '2' in n else 12 if 'bok' in n else 13 if 'mmt' in n else 14 if 'ctio' in n and '1' in n else 15 if 'ctio' in n and '4' in n else 16 if 'gemini' in n and 'north' in n else 17 if 'gemini' in n and 'south' in n else 18 if 'vlt' in n else 19 if '3.5m' in n else 20 if 'subaru' in n else header['TELESCOP']
       except KeyError: telescope_id = ''
     if not instrument_id:
       try: 
@@ -154,7 +153,7 @@ class get_db:
     For **search** input of text string, i.e. 'vb10', returns all sources with case-insensitive partial text matches in *names* or *designation* columns.
     '''
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
-    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%'"
+    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%' or unum like '%"+search+"%' or shortname like '%"+search+"%'"
     results = self.query.execute(q).fetchall()
     if results: u.printer(['id','ra','dec','designation','unum','short','names'], results, truncate=75)
     else: print "No objects found by {}".format(search)
@@ -178,8 +177,7 @@ class get_db:
         u.printer(['id','unum','name','ra','dec','Spec Count','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR','grav'], D)
         if plot:
           for I in IDS:
-            spectra = self.dict.execute("SELECT * FROM spectra WHERE source_id={}".format(I)).fetchall()
-            for i in spectra: plt.figure(), plt.rc('text', usetex=False), plt.loglog(i['wavelength'], i['flux'], c='b', label='spec_id: {}'.format(i['id'])), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title('source_id = {}'.format(I)), plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i['filename'],self.query.execute("SELECT name FROM telescopes WHERE id={}".format(i['telescope_id'])).fetchone()[0] if i['telescope_id'] else '',self.query.execute("SELECT name FROM instruments WHERE id={}".format(i['instrument_id'])).fetchone()[0] if i['instrument_id'] else '',i['obs_date']), verticalalignment='top'), plt.legend(loc=0)
+            for i in self.dict.execute("SELECT * FROM spectra WHERE source_id={}".format(I)).fetchall(): self.plot_spectrum(i['id'])
         if data: return D
       else: print "No sources found{}.".format(' with id '+str(ID) if ID else '')
     except IndexError: pass
@@ -190,6 +188,28 @@ class get_db:
           data = map(list, self.query.execute("SELECT * FROM {} WHERE source_id={}".format(table,ID)).fetchall())
           for d in data+[columns,types]: d.pop(1)
           if data: u.printer([c.replace('wavelength_units','units').replace('flux_units','units').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('wavelength','wav').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=15 if table=='spectra' else 50, title=table.upper())
+
+  def header(self, spectrum_id_or_path):
+    '''
+    Prints the header information for the given **spectrum_id_or_path**.
+    '''
+    if isinstance(spectrum_id_or_path,int):
+      try: 
+        H = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id_or_path)).fetchone()['header']
+        if H: return H
+        else: print 'No header for spectrum {}'.format(spectrum_id_or_path)
+      except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
+    elif os.path.isfile(spectrum_id_or_path):
+      if spectrum_id_or_path.endswith('.fits'):
+        H = pf.getheader(spectrum_id_or_path)
+        print ''.join(H) if H else 'No header for spectrum {}'.format(spectrum_id_or_path)
+      else:
+        txt, H = open(spectrum_id_or_path), []
+        for i in txt: 
+          if i.startswith('#'): H.append(i)
+        txt.close()
+        print ''.join(H) if H else 'No header for spectrum {}'.format(spectrum_id_or_path)
+    else: print 'No such file {}'.format(spectrum_id_or_path)
 
   def merge(self, conflicted):
     '''
@@ -227,8 +247,8 @@ class get_db:
     data = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id)).fetchone()
     if data:
       import csv
-      fn, header = '{}{}.txt'.format(filepath, data['filename'] or spectrum_id), repr([repr(r) for r in data['header'].ascardlist()])
-      if header:
+      fn, header = '{}{}.txt'.format(filepath, data['filename'] or spectrum_id), repr([repr(r) for r in data['header'].ascardlist()]) if data['header'] else None
+      if data['header']:
         with open(fn, 'w' ) as f:
           keys, vals, coms = zip(*[eval(l) for l in eval(header)])
           klen, vlen, clen = [len(max(['1' if isinstance(j,bool) and j else '0' if isinstance(j,bool) else str(j) for j in i], key=len)) for i in [keys,vals,coms]]
@@ -252,6 +272,20 @@ class get_db:
               self.query.execute("INSERT INTO publications VALUES(?, ?, ?, ?, ?)", (None, None, short, None, None)), self.modify.commit()
               pubs = {j:i for i,j in self.query.execute("SELECT id,shortname FROM publications").fetchall()}
               self.query.execute("UPDATE {} SET publication_id={} WHERE id={}".format(table,pubs[short],ID)), self.modify.commit()
+
+  def plot_spectrum(self, ID):
+    '''
+    Plots spectrum **ID** from SPECTRA table.
+    '''
+    i = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(ID)).fetchone()
+    if i:
+      try:
+        plt.figure(), plt.rc('text', usetex=False), plt.loglog(i['wavelength'], i['flux'], c='b', label='spec_id: {}'.format(i['id'])), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title('source_id = {}'.format(i['source_id'])), plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i['filename'],self.query.execute("SELECT name FROM telescopes WHERE id={}".format(i['telescope_id'])).fetchone()[0] if i['telescope_id'] else '',self.query.execute("SELECT name FROM instruments WHERE id={}".format(i['instrument_id'])).fetchone()[0] if i['instrument_id'] else '',i['obs_date']), verticalalignment='top'), plt.xlabel('[{}]'.format(i['wavelength_units'])), plt.ylabel('[{}]'.format(i['flux_units'])), plt.legend(loc=8, frameon=False)
+        X, Y = plt.xlim(), plt.ylim()
+        try: plt.fill_between(i['wavelength'], i['flux']-i['unc'], i['flux']+i['unc'], color='b', alpha=0.3), plt.xlim(X), plt.ylim(Y)
+        except TypeError: print 'No uncertainty array for spectrum {}'.format(ID)
+      except: print "Couldn't print spectrum {}".format(ID)
+    else: print "No spectrum {} in the SPECTRA table.".format(ID)
 
   def edit_columns(self, table, columns, types):
     '''
