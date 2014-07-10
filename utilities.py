@@ -351,6 +351,7 @@ def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], 
   '''
   def red(t): print "\033[01;31m{0}\033[00m".format(t),
   # if not to_txt: print '\r'
+  labels = list(labels)
   values = [["-" if i=='' or i is None else "{:.6g}".format(i) if isinstance(i,(float,int)) else i if isinstance(i,(str,unicode)) else "{:.6g} {}".format(i.value,i.unit) if hasattr(i,'unit') else i for i in j] for j in values]
   auto, txtFile = [max([len(i) for i in j])+2 for j in zip(labels,*values)], open(to_txt, 'a') if to_txt else None
   lengths = format if isinstance(format,list) else [min(truncate,i) for i in auto]
