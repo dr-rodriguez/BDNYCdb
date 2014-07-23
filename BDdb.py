@@ -167,37 +167,34 @@ class get_db:
     if results: u.printer(['id','ra','dec','designation','unum','short','names'], results, truncate=75, empties=True)
     else: print "No objects found by {}".format(search)
       
-  def inventory(self, ID='', unum='', verbose=True, with_pi=False, SED=False, plot=False, data=False):
+  def inventory(self, ID, verbose=True, plot=False, data=False):
     '''
     Prints a summary of all objects in the database. Input string or list of strings in **ID** or **unum** for specific objects.
     '''
-    q = "SELECT sources.id, sources.unum, sources.designation, sources.ra, sources.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR'), (SELECT gravity from spectral_types WHERE spectral_types.source_id=sources.id) FROM sources"
-    if ID or unum:
-      if unum: 
-        unums = unum if isinstance(unum,list) else [unum]
-        IDS = zip(*self.dict.execute("SELECT * FROM sources WHERE unum IN ({})".format("'"+"','".join(unums)+"'")).fetchall())[0]
-      else: IDS = ID if isinstance(ID,list) else [ID]  
-      q += ' WHERE id IN ({})'.format("'"+"','".join(map(str,IDS))+"'")
-    elif with_pi: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None'"
-    elif SED: q += " JOIN parallaxes ON parallaxes.source_id=sources.id WHERE parallaxes.parallax!='None' AND (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR')>0 AND (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id) >0" 
-    try:
-      D = self.query.execute(q).fetchall()
-      if D:
-        u.printer(['id','unum','name','ra','dec','Spec Count','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR','grav'], D, empties=True)
-        if plot:
-          for I in IDS:
-            for i in self.dict.execute("SELECT * FROM spectra WHERE source_id={}".format(I)).fetchall(): self.plot_spectrum(i['id'])
-        if data: return D
-      else: print "No sources found{}.".format(' with id '+str(ID) if ID else '')
-    except IndexError: pass
-    if ID and verbose:
-      for table in [t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1] if t!='sources']:
-        columns, types = map(list,zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3])
-        if 'source_id' in columns:
-          data = map(list, self.query.execute("SELECT * FROM {} WHERE source_id={}".format(table,ID)).fetchall())
-          for d in data+[columns,types]: d.pop(1)
-          if data: u.printer([c.replace('wavelength_units','units').replace('flux_units','units').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('wavelength','wav').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=15 if table=='spectra' else 50, title=table.upper(), empties=True)
-
+    if ID:
+      q = "SELECT sources.id, sources.unum, sources.designation, sources.ra, sources.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR'), (SELECT gravity from spectral_types WHERE spectral_types.source_id=sources.id) FROM sources"
+      IDS = ID if isinstance(ID,list) else [ID]
+      
+      if len(IDS)==1 and verbose:
+        for table in ['sources']+[t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1] if t!='sources']:
+          columns, types = map(list,zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3])
+          if 'source_id' in columns or table=='sources':
+            data = map(list, self.query.execute("SELECT * FROM {} WHERE {}".format(table,'id={}'.format(ID) if table=='sources' else 'source_id={}'.format(ID))).fetchall())
+            for d in data+[columns,types]:
+              if table!='sources': d.pop(1)
+            if data: u.printer([c.replace('wavelength_units','units').replace('flux_units','units').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('wavelength','wav').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=15 if table=='spectra' else 50, title=table.upper(), empties=True)
+      else:
+        try:
+          D = self.query.execute(q+' WHERE id IN ({})'.format("'"+"','".join(map(str,IDS))+"'")).fetchall()
+          if D:
+            u.printer(['id','unum','name','ra','dec','Spec Count','Optical','NIR','Phot Count','Pi','Pi_unc','OPT','IR','grav'], D, empties=True)
+            if data: return D
+          else: print "No sources found{}.".format(' with id '+str(ID) if ID else '')
+        except IndexError: pass
+      if plot:
+        for I in IDS:
+          for i in self.dict.execute("SELECT * FROM spectra WHERE source_id={}".format(I)).fetchall(): self.plot_spectrum(i['id'])
+            
   def header(self, spectrum_id_or_path):
     '''
     Prints the header information for the given **spectrum_id_or_path**.

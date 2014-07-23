@@ -179,21 +179,21 @@ def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', colo
   kernel = st.gaussian_kde(values)
   Z = np.reshape(kernel(positions).T, X.shape)
   ax1.set_xlim([xmin,xmax]), ax1.set_ylim([ymin,ymax]), ax1.imshow(np.rot90(Z), cmap=plt.cm.jet, extent=[xmin, xmax, ymin, ymax], aspect='auto'), ax2.hist(data[0], 24, histtype='stepfilled', normed=True, align='mid', alpha=0.5, color=color), ax3.hist(data[1], 4, histtype='stepfilled', normed=True, orientation='horizontal', align='mid', alpha=0.5, color=color), ax1.grid(True), ax2.grid(True), ax3.grid(True), ax2.xaxis.tick_top(), ax3.yaxis.tick_right()
-  T, G = st.mode(data[0]), st.mode(data[1])
+  T, G, P = st.mode(data[0]), st.mode(data[1]), st.mode(data[-1])
   teff, teff_frac, logg, logg_frac = T[0][0], T[1][0]/len(data[0]), G[0][0], G[1][0]/len(data[0]) 
   ax1.axvline(x=teff, color='#ffffff'), ax1.axhline(y=logg, color='#ffffff'), ax1.plot(teff, logg, marker='o', color='#ffffff', zorder=2), ax1.set_xlabel('Teff'), ax1.set_ylabel('log(g)'), plt.title('{} {}'.format(teff,logg)), fig.subplots_adjust(hspace=0, wspace=0), fig.canvas.draw()
   if save: plt.savefig(save)
-  return [teff, teff_frac, logg, logg_frac]
+  return [teff, teff_frac, logg, logg_frac, P[0][0]]
 
 def montecarlo(spectrum, modelDict, N=100, exclude=[], save=''):
   G = []
   for p in modelDict.keys():
     model, g = rebin_spec([modelDict[p]['wavelength'],modelDict[p]['flux']], spectrum[0]), []
-    for _ in itertools.repeat(None,N): g.append((goodness(spectrum, [model[0], model[1]*abs(np.random.normal(size=len(model[1]))), model[2]], exclude=exclude)[0], int(p.split()[0]), float(p.split()[1])))
+    for _ in itertools.repeat(None,N): g.append((goodness(spectrum, [model[0], np.random.normal(model[1].value, spectrum[2].value,size=len(model[1].value))*model[1].unit, model[2]], exclude=exclude)[0], int(p.split()[0]), float(p.split()[1]), p))
     G.append(g)
   bests = [min(i) for i in zip(*G)]
-  fits, teff, logg = zip(*bests)
-  return marginalized_distribution([teff, logg, fits], save=save)
+  fits, teff, logg, params = zip(*bests)
+  return marginalized_distribution([teff, logg, fits, params], save=save)
 
 def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, d='', sig_d='', exclude=[], plot=False, Rlim=(0,100), Tlim=(700,3000), title='', weighting=True, verbose=False, save=''):
   '''
@@ -229,7 +229,8 @@ def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, d='', sig_
     plt.legend(loc=0), plt.grid(True), plt.yscale('log'), plt.ylabel('Goodness of Fit'), plt.xlabel('Teff'), plt.suptitle(plot) 
     if save: plt.savefig(save+' - fit plot.png')#, printer(['Params','G','radius','Lbol'], to_print, to_txt=save+' - fit.txt')
 
-  return [final_spec, best[1], best[2], best[3], best[4], best[5]]
+  return [best[1].split()[0], 1, best[1].split()[1], 1, best[1]]
+  # return [final_spec, best[1], best[2], best[3], best[4], best[5]]
 
 def modelInterp(params, model_dict, filt_dict=None, plot=False):
   '''
