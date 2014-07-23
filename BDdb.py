@@ -217,7 +217,7 @@ class get_db:
         print ''.join(H) if H else 'No header for spectrum {}'.format(spectrum_id_or_path)
     else: print 'No such file {}'.format(spectrum_id_or_path)
 
-  def merge(self, conflicted):
+  def merge(self, conflicted, tables=[]):
     '''
     Merges a **conflicted** databse copy into the master database. 
     '''
@@ -225,7 +225,7 @@ class get_db:
       con, master, reassign = get_db(conflicted), self.query.execute("PRAGMA database_list").fetchall()[0][2], {}
       con.query.execute("ATTACH DATABASE '{}' AS m".format(master)), self.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), con.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), self.query.execute("ATTACH DATABASE '{}' AS m".format(master)), u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keeps both records and assigns second one new id if necessary'],['r','Replaces all columns of first record with second record values'],['r [column name] [column name]...','Replaces specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['quit','Quit and return to command line']])
 
-      for table in ['sources']+[t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1] if t!='sources']:
+      for table in ['sources']+[t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table' and name in ({})".format("'"+"','".join(tables)+"'")).fetchall())[1] if t!='sources']:
         columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
         data = map(list, con.query.execute("SELECT * FROM (SELECT 1 AS db, {0} FROM m.{2} UNION ALL SELECT 2 AS db, {0} FROM c.{2}) GROUP BY {1} HAVING COUNT(*)=1 AND db=2".format(','.join(columns),','.join(columns[1:]),table)).fetchall())
 
