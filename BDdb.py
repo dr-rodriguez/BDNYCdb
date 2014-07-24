@@ -59,15 +59,17 @@ class get_db:
     if wavelength[0]<100: regime = 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
     else: regime = 'OPT' if wavelength[0]<8000 and wavelength[-1]<12000 else 'NIR' if wavelength[0]<12000 and wavelength[-1]>20000 else 'MIR' if wavelength[-1]>30000 else None
     try:
-      h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
+      h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').replace('COMMENT','COMMENT / ').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
       for n,i in enumerate(h): 
         if len(i)==1: h.pop(n)
         elif len(i)==2: h[n].append('')
         elif len(i)>=4: h[n] = [h[n][0],h[n][1],' '.join(h[n][2:])] 
       hdu = pf.PrimaryHDU()
-      for i in h: hdu.header.append(tuple(i))
+      for i in h: 
+        try: hdu.header.append(tuple(i))
+        except ValueError: pass
       header = hdu.header
-    except: header = pf.PrimaryHDU().header
+    except IOError: header = pf.PrimaryHDU().header
     try:
       self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]], empties=True)
@@ -127,8 +129,7 @@ class get_db:
       except: err = ''
       try: snr = flx/err if any(flx) and any(err) else None
       except (TypeError,IndexError): snr = None
-      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
-      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, None)), self.modify.commit()
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, wavelength_units, flux_units, regime, obs_date, instrument_id, telescope_id, airmass, comment]])
       self.clean_up('spectra')
     except: print "Couldn't add fits file {}".format(fitsPath); print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, airmass, comment]
