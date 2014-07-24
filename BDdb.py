@@ -318,7 +318,7 @@ def adapt_array(arr):
   np.save(out, arr), out.seek(0)
   return buffer(out.read())
 
-def adapt_header(header): return repr([repr(r) for r in header.ascardlist()])
+def adapt_header(header): return repr([repr(r) for r in header.ascardlist()]) if hasattr(header,'cards') else None
 
 def convert_array(text):
   out = io.BytesIO(text)
@@ -326,12 +326,14 @@ def convert_array(text):
   return np.load(out)
 
 def convert_header(text):
-  hdu = pf.PrimaryHDU()
-  for i in [eval(l) for l in eval(text)]:
-    if i[0]: 
-      try: hdu.header.append(i)
-      except: pass
-  return hdu.header
+  if text:
+    hdu = pf.PrimaryHDU()
+    for i in [eval(l) for l in eval(text)]:
+      if i[0]: 
+        try: hdu.header.append(i)
+        except: pass
+    return hdu.header
+  else: return None
 
 sql.register_adapter(np.ndarray, adapt_array), sql.register_adapter(pf.header.Header, adapt_header)
 sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER", convert_header)
