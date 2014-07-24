@@ -69,7 +69,7 @@ class get_db:
         try: hdu.header.append(tuple(i))
         except ValueError: pass
       header = hdu.header
-    except IOError: header = None
+    except: header = None
     # except IOError: header = pf.PrimaryHDU().header
     try:
       self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
