@@ -9,10 +9,15 @@ from pysynphot import spectrum
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
-def app2abs(mag, dist, sig_m='', sig_d='', flux=False):
-  if isinstance(mag,(float,int)): return (mag*10*q.pc/dist, 10*q.pc*np.sqrt((sig_m/dist)**2 + (sig_d*mag/dist**2)**2)*mag.unit/dist.unit if sig_m and sig_d else '') if flux else (mag-5*np.log10(dist/(10*q.pc)), np.sqrt(sig_m**2 + 25*(sig_d/dist).value**2) if sig_m and sig_d else '')
-  elif hasattr(mag,'unit'): return (mag*10*q.pc/dist).to(mag.unit), (10*q.pc*np.sqrt((sig_m**2 + (sig_d*mag/dist)**2).to(mag.unit**2))*mag.unit/dist).to(mag.unit) if sig_m!='' and sig_d else ''
-  else: print 'Could not absolutely flux calibrate that input.'
+# def scale_mag(mag, dist, sig_m='', sig_d='', scale_to=10*q.pc, flux=False):
+#   if isinstance(mag,(float,int)): return (mag*scale_to/dist, scale_to*np.sqrt((sig_m/dist)**2 + (sig_d*mag/dist**2)**2)*mag.unit/dist.unit if sig_m and sig_d else '') if flux else (mag-5*np.log10(dist/scale_to), np.sqrt(sig_m**2 + 25*(sig_d/dist).value**2) if sig_m and sig_d else '')
+#   elif hasattr(mag,'unit'): return (mag*scale_to/dist).to(mag.unit), (scale_to*np.sqrt((sig_m**2 + (sig_d*mag/dist)**2).to(mag.unit**2))*mag.unit/dist).to(mag.unit) if sig_m!='' and sig_d else ''
+#   else: print 'Could not absolutely flux calibrate that input.'
+
+def flux_calibrate(mag, dist, sig_m='', sig_d='', scale_to=10*q.pc):
+  if isinstance(mag,(float,int)): return [mag-5*np.log10(dist/scale_to), np.sqrt(sig_m**2 + 25*(sig_d/(dist*np.log(10))).value**2) if sig_m and sig_d else '']
+  elif hasattr(mag,'unit'): return [(mag*dist**2/scale_to**2).to(mag.unit), (np.sqrt((sig_m*dist**2)**2 + (2*sig_d*mag*dist)**2)*mag.unit*dist.unit**2/scale_to**2) if sig_m!='' and sig_d else '']
+  else: print 'Could not flux calibrate that input to distance {}.'.format(dist)
   
 def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
   '''
@@ -153,14 +158,16 @@ def idx_exclude(x, exclude):
 
 def mag2flux(band, mag, sig_m='', photon=False):
   '''
-  For given band and magnitude, returns the flux value in [ergs][s-1][cm-2][A-1]
-  mag = -2.5*log10(F/zp)  =>  flux = zp*10**(-mag/2.5)
+  For given band and magnitude returns the flux value (and uncertainty if *sig_m*) in [ergs][s-1][cm-2][A-1]
   '''
   f = (a.filter_info(band)['zp_photon' if photon else 'zp']*(1 if photon else q.erg)/q.s/q.cm**2/q.AA*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/q.AA)
   sig_f = f*sig_m*np.log(10)/2.5 if sig_m else ''
   return (f, sig_f)
   
 def flux2mag(band, flux, sig_f='', photon=True): 
+  '''
+  For given band and flux returns the magnitude value (and uncertainty if *sig_f*)
+  '''
   F = -2.5*np.log10(flux/a.filter_info(band)['zp_photon' if photon else 'zp'])
   sig_F = (2.5/np.log(10))*(sig_f/F).value if sig_f else ''  
   return (F,sig_F)
@@ -186,6 +193,9 @@ def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', colo
   return [teff, teff_frac, logg, logg_frac, P[0][0]]
 
 def montecarlo(spectrum, modelDict, N=100, exclude=[], save=''):
+  '''
+  For given *spectrum* and dictionary of models *modelDict*, runs a Monte Carlo simulation *N* times on each model
+  '''
   G = []
   for p in modelDict.keys():
     model, g = rebin_spec([modelDict[p]['wavelength'],modelDict[p]['flux']], spectrum[0]), []
@@ -340,11 +350,13 @@ def pi2pc(parallax):
     return (d, sig_d)
   else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
 
-def polynomial(n, m, sig='', degree=1, c='k', ls='-'):
+def polynomial(n, m, sig='', x='x', y='y', degree=1, c='k', ls='--', lw=2, legend=True, ax=''):
   p = np.polyfit(np.array(map(float,n)), np.array(map(float,m)), degree, w=1/np.array([i if i else 1 for i in sig]) if sig!='' else None)
   f = np.poly1d(p)
   w = np.linspace(min(n), max(n), 50)
-  plt.plot(w, f(w), c=c, ls='-') # label='{} = {}'.format(y,' '.join(['- {}{}'.format(i[1:5],'${}^{}$'.format(x,str(len(p)-n-1)) if n!=len(p)-1 else '') if '-' in i else '+ {}{}'.format(i[:4],'${}^{}$'.format(x,str(len(p)-n-1)) if n!=len(p)-1 else '') for n,i in enumerate(map(str,p))])))
+  ax.plot(w, f(w), c=c, ls=ls, lw=lw, label='${}$'.format(poly_print(p, x=x, y=y)) if legend else '', zorder=-1)
+
+def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3f}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
 
 def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], skip=[], empties=False, title=False):
   '''

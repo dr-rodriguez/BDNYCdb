@@ -56,8 +56,8 @@ class get_db:
       snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[-1][1:], dtype='float32') if snrPath else ''
       unc = flx/snr if snrPath else np.array(data[2], dtype='float32')
     except: snr = unc = ''
-    if wavelength[0]<100: regime = 'OPT' if wavelength[0]<0.8 and wavelength[-1]<1.2 else 'NIR' if wavelength[0]<1.2 and wavelength[-1]>2 else 'MIR' if wavelength[-1]>3 else None
-    else: regime = 'OPT' if wavelength[0]<8000 and wavelength[-1]<12000 else 'NIR' if wavelength[0]<12000 and wavelength[-1]>20000 else 'MIR' if wavelength[-1]>30000 else None
+    wave_const = 10000 if wavelength[0]<100 else 1
+    regime = 'OPT' if wavelength[0]<0.8*wave_const and wavelength[-1]<1.2*wave_const else 'NIR' if wavelength[0]<1.2*wave_const and wavelength[-1]>2*wave_const else 'MIR' if wavelength[-1]>3*wave_const else None
     try:
       h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').replace('COMMENT','COMMENT / ').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
       for n,i in enumerate(h): 
@@ -65,7 +65,7 @@ class get_db:
         elif len(i)==2: h[n].append('')
         elif len(i)>=4: h[n] = [h[n][0],h[n][1],' '.join(h[n][2:])] 
       hdu = pf.PrimaryHDU()
-      for i in h: 
+      for i in h:
         try: hdu.header.append(tuple(i))
         except ValueError: pass
       header = hdu.header
@@ -79,7 +79,7 @@ class get_db:
     except IOError: 
       print "Couldn't add spectrum to database."
 
-  def add_fits(self, fitsPath, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''):
+  def add_fits(self, fitsPath, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment='', wlog=False):
     '''
     Checks the header of the **fitsFile** and inserts the data with **source_id**.
     '''
@@ -123,7 +123,7 @@ class get_db:
     except: airmass = 0
     
     try:
-      data = a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False)[0]
+      data = a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0]
       wav, flx = data[:2]
       if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>5 else None     
       else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>50000 else None     
@@ -210,8 +210,7 @@ class get_db:
       except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
     elif os.path.isfile(spectrum_id_or_path):
       if spectrum_id_or_path.endswith('.fits'):
-        H = pf.getheader(spectrum_id_or_path)
-        print ''.join(H) if H else 'No header for spectrum {}'.format(spectrum_id_or_path)
+        return pf.getheader(spectrum_id_or_path)
       else:
         txt, H = open(spectrum_id_or_path), []
         for i in txt: 
@@ -315,18 +314,31 @@ class get_db:
 # ==============================================================================================================================================
   
 def adapt_array(arr):
+  '''
+  Turns an ARRAY string stored in the database back into a Numpy array.
+  '''
   out = io.BytesIO()
   np.save(out, arr), out.seek(0)
   return buffer(out.read())
 
-def adapt_header(header): return repr([repr(r) for r in header.ascardlist()]) if hasattr(header,'cards') else None
+def adapt_header(header): 
+  '''
+  Turns a HEADER string stored in the database back into a FITS header.
+  '''
+  return repr([repr(r) for r in header.ascardlist() if type(r[1]) in [int,float,str]]) if hasattr(header,'cards') else None
 
 def convert_array(text):
+  '''
+  Converts a Numpy array into an ARRAY string to put into the database.
+  '''
   out = io.BytesIO(text)
   out.seek(0)
   return np.load(out)
 
 def convert_header(text):
+  '''
+  Converts a FITS feader into a HEADER string to put into the database.
+  '''
   if text:
     hdu = pf.PrimaryHDU()
     for i in [eval(l) for l in eval(text)]:
