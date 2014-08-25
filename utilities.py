@@ -102,7 +102,7 @@ def find(filename, tree):
 
   return result
 
-def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','HST','Bessel','MKO','GALEX','DENIS']], systems=['2MASS','SDSS','WISE','IRAC','HST','Bessel','MKO','GALEX','DENIS']):
+def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS']], systems=['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS']):
   '''
   Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1]. 
   '''
@@ -355,6 +355,7 @@ def polynomial(n, m, sig='', x='x', y='y', degree=1, c='k', ls='--', lw=2, legen
   f = np.poly1d(p)
   w = np.linspace(min(n), max(n), 50)
   ax.plot(w, f(w), c=c, ls=ls, lw=lw, label='${}$'.format(poly_print(p, x=x, y=y)) if legend else '', zorder=-1)
+  print poly_print(p, x=x, y=y)
 
 def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3f}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
 

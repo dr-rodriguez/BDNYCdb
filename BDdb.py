@@ -167,7 +167,9 @@ class get_db:
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
     except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%' or unum like '%"+search+"%' or shortname like '%"+search+"%'"
     results = self.query.execute(q).fetchall()
-    if results: u.printer(['id','ra','dec','designation','unum','short','names'], results, truncate=75, empties=True)
+    if results: 
+      if len(results)==1: self.inventory(int(results[0][0]))
+      else: u.printer(['id','ra','dec','designation','unum','short','names'], results, truncate=75, empties=True)
     else: print "No objects found by {}".format(search)
       
   def inventory(self, ID, verbose=True, plot=False, data=False):

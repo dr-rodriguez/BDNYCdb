@@ -42,6 +42,7 @@ def filter_info(band):
               "[4.5]":   { 'eff': 4.436578, 'min': 3.917328, 'max': 5.056057, 'zp': 2.726866e-12, 'zp_photon': 6.090264e+00, 'ABtoVega':0,    'ext': 0.05,   'system': 'IRAC' },
               "[5.8]":   { 'eff': 5.628102, 'min': 4.898277, 'max': 6.508894, 'zp': 1.077512e-12, 'zp_photon': 3.052866e+00, 'ABtoVega':0,    'ext': 0.04,   'system': 'IRAC' },
               "[8]":     { 'eff': 7.589159, 'min': 6.299378, 'max': 9.587595, 'zp': 3.227052e-13, 'zp_photon': 1.232887e+00, 'ABtoVega':0,    'ext': 0.03,   'system': 'IRAC' },              
+              "[24]":    { 'eff': 23.20960, 'min': 19.88899, 'max': 30.93838, 'zp': 3.935507e-15, 'zp_photon': 4.598249e-02, 'ABtoVega':0,    'ext': 0.02,   'system': 'MIPS' },              
               "F336W":   { 'eff': 0.332930, 'min': 0.295648, 'max': 0.379031, 'zp': 3.251259e-09, 'zp_photon': 5.486427e+02, 'ABtoVega':0,    'ext': 1.70,   'system': 'HST' },
               "F390N":   { 'eff': 0.388799, 'min': 0.384000, 'max': 0.393600, 'zp': 5.673647e-09, 'zp_photon': 1.143901e+03, 'ABtoVega':0,    'ext': 1.48,   'system': 'HST' },
               "F475W":   { 'eff': 0.470819, 'min': 0.386334, 'max': 0.556272, 'zp': 5.331041e-09, 'zp_photon': 1.260475e+03, 'ABtoVega':0,    'ext': 1.21,   'system': 'HST' },
