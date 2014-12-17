@@ -34,19 +34,20 @@ class get_db:
       data_columns = data.pop(0)
       for row in data:
         values = [None for i in columns]
+        values[0] = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM {}".format(table)).fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM {}".format(table)).fetchall())[0])))[0]
         for col in columns: values[columns.index(col)] = row[data_columns.index(col)] if col in data_columns and row[data_columns.index(col)] else None
         update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
     if insert:
       u.printer(columns, insert, truncate=30, empties=True), self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), insert), self.modify.commit()
       print "{} new records added to the {} table.".format(len(insert),table.upper())
     if update:
-      u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keeps both records and assigns second one new id if necessary'],['r','Replaces all columns of first record with second record values'],['r [column name] [column name]...','Replaces specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['quit','Quit and return to command line']])
+      u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keeps both records and assigns second one new id if necessary'],['r','Replaces all columns of first record with second record values'],['r [column name] [column name]...','Replaces specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['abort','Abort merge of current table, undo all changes, and proceed to next table']], title=' ')
       for item in update:
         record = self.query.execute("SELECT * FROM {} WHERE id={}".format(table, item[columns.index('id')])).fetchone()
         if record: compare_records(self, table, columns, record, item)
-    # self.clean_up(table)
+    self.clean_up(table)
    
-  def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], skip=[], start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment=''): 
+  def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], skip=[], start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment=''): 
     '''
     Adds an ascii spectrum to the *spectra* table given an **asciiPath**. Any *spectra* table columns besides *wavelength*, *flux*, *unc*, *snr* arrays can be specified as arguments.
     '''
@@ -72,14 +73,16 @@ class get_db:
     except: header = None
     # except IOError: header = pf.PrimaryHDU().header
     try:
-      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
-      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, None)), self.modify.commit()
-      u.printer(['source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'airmass', 'filename', 'comment'],[[source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment]], empties=True)
-      self.clean_up('spectra')
+      # Get the lowest spec_id from the spectra table
+      spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
+      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
+      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, None)), self.modify.commit()
+      u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
+      # self.clean_up('spectra')
     except IOError: 
       print "Couldn't add spectrum to database."
 
-  def add_fits(self, fitsPath, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', airmass=0, comment='', wlog=False):
+  def add_fits(self, fitsPath, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', wlog=False, SDSS=False):
     '''
     Checks the header of the **fitsFile** and inserts the data with **source_id**.
     '''
@@ -123,24 +126,31 @@ class get_db:
     except: airmass = 0
     
     try:
-      data = a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0]
-      wav, flx = data[:2]
-      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>5 else None     
-      else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>50000 else None     
-      try: err = data[2]
-      except: err = ''
+      if SDSS:
+        data = pf.open(fitsPath, memmap=True)[1].data
+        flx, wav, err = map(np.array,zip(*data)[:3])
+        flx, wav, err, wavelength_units, flux_units = flx*10**-17, 10**wav, np.sqrt(1/err)*10**-17, 'A', 'ergs-1cm-2A-1'
+      else:
+        data = a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0]
+        wav, flx = data[:2]
+        try: err = data[2]
+        except: err = ''
       try: snr = flx/err if any(flx) and any(err) else None
       except (TypeError,IndexError): snr = None
-      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (None, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, airmass, filename, comment, header)), self.modify.commit()
-      u.printer(['filename','source_id', 'xunits', 'yunits', 'regime', 'date', 'instr', 'scope', 'airmass', 'name'],[[filename, source_id, wavelength_units, flux_units, regime, obs_date, instrument_id, telescope_id, airmass, comment]])
-      self.clean_up('spectra')
-    except: print "Couldn't add fits file {}".format(fitsPath); print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, airmass, comment]
+
+      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
+      else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None     
+
+      spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
+      u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
+      # self.clean_up('spectra')
+    except KeyError: print "Couldn't add fits file {}".format(fitsPath); print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, mode_id, airmass, comment]
   
   def clean_up(self, table):
     '''
     Removes exact duplicates, blank records or data without a *source_id* from the specified **table**. Then finds possible duplicates and prompts for conflict resolution.
     '''
-    print 'Attemting clean up on table {}'.format(table.upper())
     (columns, types), dup, ignore, I = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], 1, [], ''
     
     # Delete blank records, exact duplicates, or data without a source_id
@@ -149,15 +159,34 @@ class get_db:
     if 'source_id' in columns: self.query.execute("DELETE FROM {0} WHERE source_id IS NULL OR source_id IN ('null','None','')".format(table))
     
     if table in ['sources','spectra','photometry','spectral_types','radial_velocities','parallaxes','proper_motions']:
+      # Define columns to check for uniqueness
       primary, secondary, ignore = ['flux','magnitude','parallax','spectral_type','proper_motion_ra','proper_motion_dec','radial_velocity'], ['band','regime'], []
+      
+      # Find non-unique records and run BDdb.compare_records()
       while dup:
-        if table=='sources': dup = self.query.execute("SELECT t1.*, t2.* FROM sources t1 JOIN sources t2 WHERE t1.id!=t2.id AND t1.ra BETWEEN t2.ra-0.0007 AND t2.ra+0.0007 AND t1.dec BETWEEN t2.dec-0.00077 AND t2.dec+0.0007{}".format(' AND '+' OR '.join(['(t1.id NOT IN ({0}) AND t2.id NOT IN ({0}))'.format(','.join(map(str,i))) for i in ignore]) if ignore else '')).fetchone() 
-        else: dup = self.query.execute("SELECT t1.*, t2.* FROM {0} AS t1 JOIN {0} AS t2 ON t1.source_id=t2.source_id WHERE t1.id!=t2.id AND t1.{1}=t2.{1}{2}{3}".format(table, [c for c in columns if c in primary].pop(), ' AND t1.{0}=t2.{0}'.format([c for c in columns if c in secondary].pop()) if [c for c in columns if c in secondary] else '', ' AND '+' OR '.join(['(t1.id NOT IN ({0}) AND t2.id NOT IN ({0}))'.format(','.join(map(str,i))) for i in ignore]) if ignore else '')).fetchone()
+        # Check SOURCES table for records with similar RA and Dec but different ids that are not companions or system components.
+        if table=='sources': dup = self.query.execute(  "SELECT t1.*, t2.* FROM sources t1 JOIN sources t2 WHERE t1.id!=t2.id \
+                                                        AND (t1.companions IS NULL OR (t1.companions IS NOT NULL AND t1.companions NOT LIKE '%' || CAST(t2.id AS TEXT) || '%')) AND (t2.companions IS NULL OR (t2.companions IS NOT NULL AND t2.companions NOT LIKE '%' || CAST(t1.id AS TEXT) || '%')) \
+                                                        AND (t1.components IS NULL OR (t1.components IS NOT NULL AND t1.components NOT LIKE '%' || CAST(t2.id AS TEXT) || '%')) AND (t2.components IS NULL OR (t2.components IS NOT NULL AND t2.components NOT LIKE '%' || CAST(t1.id AS TEXT) || '%')) \
+                                                        AND (t1.ra BETWEEN t2.ra-0.0007 AND t2.ra+0.0007) AND (t1.dec BETWEEN t2.dec-0.00077 AND t2.dec+0.0007)\
+                                                        {}".format(' AND '+' AND '.join(['(t1.id NOT IN ({0}) AND t2.id NOT IN ({0}))'.format(','.join(map(str,i))) for i in ignore]) if ignore else '')).fetchone() 
+
+        # Check all other tables for records with identical primary and secondary column values but different ids.        
+        else: dup = self.query.execute("SELECT t1.*, t2.* FROM {0} AS t1 JOIN {0} AS t2 ON t1.source_id=t2.source_id WHERE t1.id!=t2.id AND t1.{1}=t2.{1}{2}{3}".format(table, [c for c in columns if c in primary].pop(), ' AND t1.{0}=t2.{0}'.format([c for c in columns if c in secondary].pop()) if [c for c in columns if c in secondary] else '', ' AND '+' AND '.join(['(t1.id NOT IN ({0}) AND t2.id NOT IN ({0}))'.format(','.join(map(str,i))) for i in ignore]) if ignore else '')).fetchone()        
+        
+        # Compare potential duplicates and prompt user for action on each
         if dup and dup[:len(dup)/2][0]!=dup[len(dup)/2:][0]:
           I = compare_records(self, table, columns, dup[:len(dup)/2], dup[len(dup)/2:], delete=True)
-          if I: ignore.append(I)
-          if I=='quit': break
-    print 'Quit clean up.' if I=='quit' else 'Finished clean up on table {}'.format(table.upper())
+          if isinstance(I,list): ignore.append(I)
+          elif I=='undo': pass # Add this functionality!
+          elif I=='abort': break
+          else: pass
+    
+    # Finish or abort table merge
+    if I=='abort': 
+      print '\nAborted merge of {} table. Undoing all changes.\n'.format(table.upper())
+      return 'abort'
+    else: print 'Finished clean up on {} table.'.format(table.upper())
   
   def identify(self, search):
     '''
@@ -165,11 +194,11 @@ class get_db:
     For **search** input of text string, i.e. 'vb10', returns all sources with case-insensitive partial text matches in *names* or *designation* columns.
     '''
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
-    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%' or unum like '%"+search+"%' or shortname like '%"+search+"%'"
+    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,components,companions,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%' or unum like '%"+search+"%' or shortname like '%"+search+"%'"
     results = self.query.execute(q).fetchall()
     if results: 
       if len(results)==1: self.inventory(int(results[0][0]))
-      else: u.printer(['id','ra','dec','designation','unum','short','names'], results, truncate=75, empties=True)
+      else: u.printer(['id','ra','dec','designation','unum','short','components','companions','names'], results, truncate=40, empties=True)
     else: print "No objects found by {}".format(search)
       
   def inventory(self, ID, verbose=True, plot=False, data=False):
@@ -187,7 +216,8 @@ class get_db:
             data = map(list, self.query.execute("SELECT * FROM {} WHERE {}".format(table,'id={}'.format(ID) if table=='sources' else 'source_id={}'.format(ID))).fetchall())
             for d in data+[columns,types]:
               if table!='sources': d.pop(1)
-            if data: u.printer([c.replace('wavelength_units','units').replace('flux_units','units').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('wavelength','wav').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=15 if table=='spectra' else 50, title=table.upper(), empties=True)
+              if table=='spectra': d.pop(1), d.pop(2), d.pop(3), d.pop(3)
+            if data: u.printer([c.replace('wavelength_units','W').replace('flux_units','F').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=20 if table=='sources' else 50, title=table.upper(), empties=True)
       else:
         try:
           D = self.query.execute(q+' WHERE id IN ({})'.format("'"+"','".join(map(str,IDS))+"'")).fetchall()
@@ -221,32 +251,80 @@ class get_db:
         print ''.join(H) if H else 'No header for spectrum {}'.format(spectrum_id_or_path)
     else: print 'No such file {}'.format(spectrum_id_or_path)
 
-  def merge(self, conflicted, tables=[]):
+  def merge(self, conflicted, tables=[], diff_only=True):
     '''
-    Merges a **conflicted** databse copy into the master database. 
+    Merges specific **tables** or all tables of **conflicted** databse into the master database.
     '''
     if os.path.isfile(conflicted):
+      # Load and attach master and conflicted databases
       con, master, reassign = get_db(conflicted), self.query.execute("PRAGMA database_list").fetchall()[0][2], {}
-      con.query.execute("ATTACH DATABASE '{}' AS m".format(master)), self.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), con.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), self.query.execute("ATTACH DATABASE '{}' AS m".format(master)), u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keeps both records and assigns second one new id if necessary'],['r','Replaces all columns of first record with second record values'],['r [column name] [column name]...','Replaces specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['quit','Quit and return to command line']])
-
-      for table in ['sources']+[t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table' and name in ({})".format("'"+"','".join(tables)+"'")).fetchall())[1] if t!='sources']:
-        columns = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
-        data = map(list, con.query.execute("SELECT * FROM (SELECT 1 AS db, {0} FROM m.{2} UNION ALL SELECT 2 AS db, {0} FROM c.{2}) GROUP BY {1} HAVING COUNT(*)=1 AND db=2".format(','.join(columns),','.join(columns[1:]),table)).fetchall())
-
-        if data:
-          print "Merging table {}".format(table.upper())
-          for n,i in enumerate(data):
-            i = i[1:]
-            if table=='sources': reassign[i[0]] = self.query.execute("SELECT count(*) FROM sources").fetchone()[0]+1
-            elif 'source_id' in columns and i[1] in reassign.keys(): i[1] = reassign[i[1]]
-            else: pass
-            i[0] = None
-            data[n] = i
-          self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for c in columns])), data), self.modify.commit()
-          print "{} records added to {} table at '{}':".format(len(data), table, master)
-          u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15), self.clean_up(table)
-        else: print "{} table identical.".format(table.upper())
+      con.query.execute("ATTACH DATABASE '{}' AS m".format(master)), self.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), con.query.execute("ATTACH DATABASE '{}' AS c".format(conflicted)), self.query.execute("ATTACH DATABASE '{}' AS m".format(master))
       
+      # Drop any backup tables from failed merges
+      for table in tables: self.query.execute("DROP TABLE IF EXISTS Backup_{0}".format(table))
+      
+      # Gather user data to add to CHANGELOG table
+      import socket, datetime
+      user, machine_name, date, modified_tables = raw_input('Please enter your name : '), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), []
+      
+      # Print instructions for user
+      u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keeps both records and assigns second one new id if necessary'],['r','Replaces all columns of first record with second record values'],['r [column name] [column name]...','Replaces specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['abort','Abort merge of current table, undo all changes, and proceed to next table']], title=' ')
+      
+      # Merge table by table, starting with SOURCES
+      tables = tables or ['sources']+[t for t in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE name NOT LIKE '%Backup%' AND type='table'{}".format(" AND name IN ({})".format("'"+"','".join(tables)+"'") if tables else '')).fetchall())[1] if t!='sources']
+      for table in tables:
+        # Get column names and data types from master table and column names from conflicted table
+        (columns, types), conflicted_cols = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], zip(*con.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]
+                
+        if any([i not in columns for i in conflicted_cols]):
+          # Abort table merge if conflicted has new columns not present in master. New columns must be added to the master database first via db.edit_columns().
+          print "\nMerge of {0} table aborted since conflicted copy has columns {1} not present in master.\nAdd new columns to master with BDdb.edit_columns() and try again.\n".format(table.upper(),[i for i in conflicted_cols if i not in columns])
+        
+        else:
+          # Add new columns from master table to conflicted table if necessary
+          if any([i not in conflicted_cols for i in columns]): con.query.execute("DROP TABLE IF EXISTS Conflicted_{0}".format(table)), con.query.execute("ALTER TABLE {0} RENAME TO Conflicted_{0}".format(table)), con.query.execute("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), con.query.execute("INSERT INTO {0} ({1}) SELECT {1} FROM Conflicted_{0}".format(table, ','.join(conflicted_cols))), con.query.execute("DROP TABLE Conflicted_{0}".format(table)), con.modify.commit()
+        
+          # Pull unique records from conflicted table
+          data = map(list, con.query.execute("SELECT * FROM (SELECT 1 AS db, {0} FROM m.{2} UNION ALL SELECT 2 AS db, {0} FROM c.{2}) GROUP BY {1} HAVING COUNT(*)=1 AND db=2".format(','.join(columns),','.join(columns[1:]),table)).fetchall())
+
+          if data:
+            if diff_only:
+              u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15 if table=='spectra' else 20)
+            else:
+              # Make temporary table copy so changes can be undone at any time
+              self.query.execute("DROP TABLE IF EXISTS Backup_{0}".format(table)), self.query.execute("ALTER TABLE {0} RENAME TO Backup_{0}".format(table)), self.query.execute("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), self.query.execute("INSERT INTO {0} ({1}) SELECT {1} FROM Backup_{0}".format(table, ','.join(columns)))
+
+              # Create a dictionary of any reassigned ids from merged SOURCES tables and replace applicable source_ids in other tables.
+              print "\nMerging {} tables.\n".format(table.upper())
+              try: count = self.query.execute("SELECT MAX(id) FROM {}".format(table)).fetchone()[0]+1
+              except TypeError: count = 1
+              for n,i in enumerate([d[1:] for d in data]):
+                if table=='sources': reassign[i[0]] = count
+                elif 'source_id' in columns and i[1] in reassign.keys(): i[1] = reassign[i[1]]
+                else: pass
+                i[0] = count
+                data[n] = i
+                count += 1
+            
+              # Insert unique conflicted records into master and run BDdb.clean_up()
+              self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for c in columns])), data), self.modify.commit()
+              print "{} records added to {} table at '{}':".format(len(data), table, master)
+              u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15 if table=='spectra' else 20)
+              abort = self.clean_up(table)
+          
+              # Undo all changes to table if merge is aborted. Otherwise, push table changes to master.
+              if abort: self.query.execute("DROP TABLE {0}".format(table)), self.query.execute("ALTER TABLE Backup_{0} RENAME TO {0}".format(table)), self.modify.commit()
+              else: self.query.execute("DROP TABLE Backup_{0}".format(table)), self.modify.commit(), modified_tables.append(table.upper())
+          
+          else: print "{} tables identical.".format(table.upper())
+      
+      # Add data to CHANGELOG table
+      if not diff_only:
+        user_description = raw_input('\nPlease describe the changes made in this merge : ')
+        self.query.execute("INSERT INTO changelog VALUES(?, ?, ?, ?, ?, ?, ?)", (None, date, user, machine_name, ', '.join(modified_tables), user_description, os.path.basename(conflicted))), self.modify.commit()
+      
+      # Finish up and detach
+      print "\nMerge complete!" if not diff_only else "\nDiff complete. No changes made to either database."
       con.query.execute("DETACH DATABASE c"), self.query.execute("DETACH DATABASE c"), con.query.execute("DETACH DATABASE m"), self.query.execute("DETACH DATABASE m"), con.modify.close()
     else: print "File '{}' not found!".format(conflicted)
     
@@ -267,13 +345,15 @@ class get_db:
       u.dict2txt({str(w):{'flux [{}]'.format(data['flux_units']):str(f), 'unc [{}]'.format(data['flux_units']):str(e)} for w,f,e in zip(data['wavelength'],data['flux'],data['unc'])}, fn, column1='# wavelength [{}]'.format(data['wavelength_units']), append=True)
     else: print "No spectrum found with id {}".format(spectrum_id)
   
-  def publications(self, name=''): return self.query.execute("SELECT * FROM publications WHERE shortname LIKE '%{}%'".format(name)).fetchall()
+  def publications(self, name=''): return self.query.execute("SELECT * FROM publications WHERE id={}".format(name)).fetchone() if type(name)==int else self.query.execute("SELECT * FROM publications WHERE shortname LIKE '%{0}%' OR description LIKE '%{0}%'".format(name)).fetchall()
     
   def telescopes(self, name=''): return self.query.execute("SELECT * FROM telescopes WHERE name LIKE '%{}%'".format(name)).fetchall()
 
   def instruments(self, name=''): return self.query.execute("SELECT * FROM instruments WHERE name LIKE '%{}%'".format(name)).fetchall()
 
   def systems(self, name=''): return self.query.execute("SELECT * FROM systems WHERE name LIKE '%{}%'".format(name)).fetchall()
+
+  def modes(self, name=''): return self.query.execute("SELECT * FROM modes WHERE mode LIKE '%{}%'".format(name)).fetchall()
     
   def fix_publications(self):
     '''
@@ -309,6 +389,7 @@ class get_db:
     '''
     Rearrange, add or delete columns from database **table** with desired ordered list of **columns** and corresponding data **types**.
     '''
+    types[0] = 'INTEGER PRIMARY KEY'
     self.query.execute("ALTER TABLE {0} RENAME TO TempOldTable".format(table)), self.query.execute("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), self.query.execute("INSERT INTO {0} ({1}) SELECT {1} FROM TempOldTable".format(table, ','.join([c for c in list(zip(*self.query.execute("PRAGMA table_info(TempOldTable)").fetchall())[1]) if c in columns]))), self.query.execute("DROP TABLE TempOldTable")
 
 # ==============================================================================================================================================
@@ -357,17 +438,17 @@ sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER",
 # ================================= Little helper functions ====================================================================================
 # ==============================================================================================================================================
 
-def compare_records(db, table, columns, old, new, options=['r','c','k'], delete=False):
+def compare_records(db, table, columns, old, new, options=['r','c','k','sql'], delete=False):
   pold, pnew = ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in old], ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in new]
-  u.printer(columns, [pold,pnew], truncate=15, highlight=list(itertools.chain.from_iterable([[(i,n+1) for n,(ov,nv) in enumerate(zip(pold[1:],pnew[1:])) if ov!=nv] for i in range(2)])))
+  u.printer(columns, [pold,pnew], truncate=20, empties=True, highlight=list(itertools.chain.from_iterable([[(i,n+1) for n,(ov,nv) in enumerate(zip(pold[1:],pnew[1:])) if ov!=nv] for i in range(2)])))
   replace = raw_input("Keep both records [k]? Or replace [r], complete [c], or keep only [Press *Enter*] record {}? (Type column name to inspect or 'help' for options): ".format(old[0]))
 
   while replace.lower() in columns or replace.lower()=='help':
-    if replace.lower() in columns: u.printer(['id',replace.lower()], [[i for idx,i in enumerate(pold) if idx in [0,columns.index(replace.lower())]],[i for idx,i in enumerate(pnew) if idx in [0,columns.index(replace.lower())]]])    
-    elif replace.lower()=='help': u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keep both records and assign second one new id if necessary'],['r','Replace all columns of first record with second record values'],['r [column name] [column name]...','Replace specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['quit','Quit and return to command line']])
+    if replace.lower() in columns: u.printer(['id',replace.lower()], [[i for idx,i in enumerate(pold) if idx in [0,columns.index(replace.lower())]],[i for idx,i in enumerate(pnew) if idx in [0,columns.index(replace.lower())]]], empties=True)    
+    elif replace.lower()=='help': u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keep both records and assign second one new id if necessary'],['r','Replace all columns of first record with second record values'],['r [column name] [column name]...','Replace specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['abort','Abort merge of current table, undo all changes, and proceed to next table']], title=' ')
     replace = raw_input("Keep both records [k]? Or replace [r], complete [c], or keep only [Press *Enter*] record {}? (Type column name to inspect or 'help' for options): ".format(old[0]))
 
-  if replace and all([i in list(columns)+options for i in replace.lower().split()]):
+  if replace and (all([i in list(columns)+options for i in replace.lower().split()]) or replace.lower().startswith('sql')):
     if replace.lower().startswith('r') and 'r' in options:
       if replace.lower()=='r':
         sure = raw_input('Are you sure you want to replace record {} with record {}? [y/n] : '.format(old[0],new[0]))
@@ -389,7 +470,10 @@ def compare_records(db, table, columns, old, new, options=['r','c','k'], delete=
         if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
         else: pass
     elif replace.lower()=='k' and 'k' in options: return [old[0],new[0]]
-  elif replace.lower()=='quit': return 'quit'
+    elif replace.lower().startswith('sql ') and 'sql' in options: 
+      try: db.query.execute(replace[4:]), db.modify.commit()
+      except: pass 
+  elif replace.lower()=='abort': return 'abort'
   elif not replace:
     if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
     else: pass

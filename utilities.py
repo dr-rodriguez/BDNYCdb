@@ -42,7 +42,7 @@ def deg2sxg(ra='', dec=''):
   if dec: DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')) 
   return (RA, DEC) if ra and dec else RA or DEC 
   
-def dict2txt(DICT, writefile, column1='-', delim='\t', digits=6, order='', empties=False, append=False):
+def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', colsort='', row2='', empties=True, append=False, all_str=False):
   '''
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
   '''
@@ -54,22 +54,35 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits=6, order='', empti
       w.append(k)
       for i in D[k].keys():
         if hasattr(D[k][i],'unit'): D[k][i] = D[k][i].value
-        if digits: D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
-        else: D[k][i] = '-' if not D[k][i] else '{}'.format(D[k][i]) if isinstance(D[k][i],(float,int)) else '{}'.format(float(D[k][i])) if D[k][i].replace('.','').replace('-','').isdigit() else str(D[k][i])
+        if digits: D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) and not all_str else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() and not all_str else str(D[k][i])
+        else: D[k][i] = '-' if not D[k][i] else '{}'.format(D[k][i]) if isinstance(D[k][i],(float,int)) else '{}'.format(float(D[k][i])) if D[k][i].replace('.','').replace('-','').isdigit() and not all_str else str(D[k][i])
         w.append(i), w.append(str(D[k][i]))
     width = len(max(map(str,w), key=len))
     head = ['{!s:{}}'.format(column1,width)]
     headorder = order or sorted(D[D.keys()[0]].keys())
     for i in headorder: head.append('{!s:{}}'.format(i,width))
-    if delim == ',': head = [i.replace(' ','') for i in head]
+    if row2: units = ['{!s:{}}'.format(i,width).strip() for i in row2]
+    if delim == ',': head = [i.strip() for i in head]
     writer.writerow(head)
+    if row2: writer.writerow(units)
+    
+    rows = sorted(D.keys(), key=lambda x: D[x][colsort]) if colsort else sorted(D.keys())
+    for i in rows:
+      order = order or sorted(D[i].keys())
+      row = ['{!s:{}}'.format(i,width)]
+      for k in order:
+        if k not in D[i].keys(): D[i][k] = '' if delim==',' else '-'
+        row.append('{!s:{}}'.format(D[i][k],width))
+      if delim == ',': row = [i.strip() for i in row]
+      writer.writerow(row)
+
     for i in sorted(D.keys()):
       order = order or sorted(D[i].keys())
       row = ['{!s:{}}'.format(i,width)]
       for k in order:
         if k not in D[i].keys(): D[i][k] = '' if delim==',' else '-'
         row.append('{!s:{}}'.format(D[i][k],width))
-      if delim == ',': row = [i.replace(' ','') for i in row]
+      if delim == ',': row = [i.strip() for i in row]
       writer.writerow(row)
       
 def distance(coord1, coord2):
@@ -116,7 +129,7 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
       RSR_x, RSR_y = [np.array(map(float,i)) for i in zip(*txt2dict(filepath,to_list=True,skip=['#']))]
       RSR_x, RSR_y = (RSR_x*(q.um if min(RSR_x)<100 else q.AA)).to(q.um), RSR_y*q.um/q.um
       Filt = a.filter_info(filter_name)
-      filters[filter_name] = {'wav':RSR_x, 'rsr':RSR_y, 'system':Filt['system'], 'eff':Filt['eff']*q.um, 'min':Filt['min']*q.um, 'max':Filt['max']*q.um, 'ext':Filt['ext'], 'ABtoVega':Filt['ABtoVega'], 'zp':Filt['zp']*q.erg/q.s/q.cm**2/q.AA, 'zp_photon':Filt['zp_photon']/q.s/q.cm**2/q.AA }
+      filters[filter_name] = {'wav':RSR_x, 'rsr':RSR_y, 'system':Filt['system'], 'eff':Filt['eff']*q.um, 'min':Filt['min']*q.um, 'max':Filt['max']*q.um, 'ext':Filt['ext'], 'toVega':Filt['toVega'], 'zp':Filt['zp']*q.erg/q.s/q.cm**2/q.AA, 'zp_photon':Filt['zp_photon']/q.s/q.cm**2/q.AA }
 
     for i in filters.keys():
       if filters[i]['system'] not in systems: filters.pop(i)    
@@ -126,7 +139,7 @@ def goodness(spec1, spec2, array=False, exclude=[], filt_dict=None, weighting=Tr
   if isinstance(spec1,dict) and isinstance(spec2,dict) and filt_dict:
     bands, w1, f1, e1, f2, e2, weight, bnds = [i for i in filt_dict.keys() if all([i in spec1.keys(),i in spec2.keys()]) and i not in exclude], [], [], [], [], [], [], []
     for eff,b in sorted([(filt_dict[i]['eff'],i) for i in bands]):
-      if spec1[b] and spec1[b+'_unc'] and spec2[b]: bnds.append(b), w1.append(eff), f1.append(spec1[b]), e1.append(spec1[b+'_unc']), f2.append(spec2[b]), e2.append(spec2[b+'_unc'] if b+'_unc' in spec2.keys() else 0*spec2[b].unit), weight.append((filt_dict[b]['max']-filt_dict[b]['min']) if weighting else 1)
+      if all([spec1[b],spec1[b+'_unc'],spec2[b],spec2[b+'_unc']]): bnds.append(b), w1.append(eff), f1.append(spec1[b]), e1.append(spec1[b+'_unc']), f2.append(spec2[b]), e2.append(spec2[b+'_unc'] if b+'_unc' in spec2.keys() else 0*spec2[b].unit), weight.append((filt_dict[b]['max']-filt_dict[b]['min']) if weighting else 1)
     bands, w1, f1, e1, f2, e2, weight = map(np.array, [bnds, w1, f1, e1, f2, e2, weight])
     if verbose: printer(['Band','W_spec1','F_spec1','E_spec1','F_spec2','E_spec2','Weight','g-factor'],zip(*[bnds, w1, f1, e1, f2, e2, weight, weight*(f1-f2*(sum(weight*f1*f2/(e1**2 + e2**2))/sum(weight*f2**2/(e1**2 + e2**2))))**2/(e1**2 + e2**2)]))
   else:
@@ -171,6 +184,13 @@ def flux2mag(band, flux, sig_f='', photon=True):
   F = -2.5*np.log10(flux/a.filter_info(band)['zp_photon' if photon else 'zp'])
   sig_F = (2.5/np.log(10))*(sig_f/F).value if sig_f else ''  
   return (F,sig_F)
+
+def manual_legend(new_labels, colors, markers='', edges='', sizes='', errors='', ncol=1, append=False):
+  ax = plt.gca()
+  old_handles, old_labels = ax.get_legend_handles_labels()
+  new_handles = [plt.errorbar((1,0),(0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m, ls='none', markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors])]
+  [i[0].remove() for i in new_handles]
+  ax.legend((old_handles if append else[])+new_handles, (old_labels if append else [])+new_labels, loc=0, frameon=False, numpoints=1, handletextpad=0, handleheight=2, fontsize=20, ncol=ncol)
 
 def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
@@ -275,6 +295,27 @@ def modelReplace(spectrum, model, replace=[], tails=False, plot=False):
   newSpec = map(np.array,zip(*sorted(zip(*[np.concatenate(i) for i in zip(Spec,mSpec)]), key=lambda x: x[0])))
   if plot: plt.figure(), plt.loglog(*model[:2], color='r', alpha=0.8), plt.loglog(*spectrum[:2], color='b', alpha=0.8), plt.loglog(*newSpec[:2], color='k', ls='--'), plt.legend(loc=0)
   return [i*j for i,j in zip(newSpec,[k.unit if hasattr(k,'unit') else 1 for k in spectrum])]
+
+def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=24):
+  '''
+  Creates subplots with given number or *rows* and *columns*.
+  '''
+  fig, axes = plt.subplots(rows, columns, sharey=True if columns>1 else False, sharex=True if rows>1 else False, figsize=figsize)
+  plt.rc('text', usetex=True, fontsize=fontsize)
+  if ylabel:
+    if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical')
+    else:
+      if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+8, labelpad=fontsize-8)
+      else:
+        for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize+8, labelpad=fontsize-8)
+  if xlabel:
+    if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center')
+    else:
+      if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+8, labelpad=fontsize-8)
+      else:
+        for a,l in zip(axes,xlabel): a.set_xlabel(l, fontsize=fontsize+8, labelpad=fontsize-8)
+  plt.subplots_adjust(right=0.96, top=0.96, bottom=0.15, left=0.12, hspace=0, wspace=0), fig.canvas.draw()
+  return [fig]+list(axes)
   
 def norm_spec(spectrum, template, exclude=[], include=[]):
   '''
@@ -291,6 +332,45 @@ def norm_spec(spectrum, template, exclude=[], include=[]):
   try: S[2] *= norm                                                        
   except IndexError: pass
   return S
+
+def norm_to_mag(spectrum, magnitude, band): 
+  '''
+  Returns the flux of a given *spectrum* [W,F] normalized to the given *magnitude* in the specified photometric *band*
+  '''
+  return spectrum[1]*magnitude/s.get_mag(band, [spectrum[0]*q.um,spectrum[1]*q.erg/q.s/q.cm**2/q.AA], to_flux=True, Flam=False)[0]
+
+def group_spectra(spectra):
+  '''
+  Puts a list of *spectra* into groups with overlapping wavelength arrays
+  '''
+  groups, idx, i = [], [], 'wavelength' if isinstance(spectra[0],dict) else 0
+  for N,S in enumerate(spectra):
+    if N not in idx:
+      group, idx = [S], idx+[N]
+      for n,s in enumerate(spectra):
+        if n not in idx and any(np.where(np.logical_and(S[i]<s[i][-1],S[i]>s[i][0]))[0]): group.append(s), idx.append(n)
+      groups.append(group)
+  return groups
+  
+def make_composite(spectra):
+  '''
+  Creates a composite spectrum from a list of overlapping *spectra*
+  '''
+  spectrum = spectra.pop(0)
+  spectra = [[i.value if hasattr(i,'unit') else i for i in j] for j in spectra]
+  if spectra:
+    spectra = [norm_spec(spec, spectrum) for spec in spectra]
+    spectra = [[i.value if hasattr(i,'unit') else i for i in spec] for spec in spectra]
+    for n,spec in enumerate(spectra):
+      IDX, idx = np.where(np.logical_and(spectrum[0]<spec[0][-1],spectrum[0]>spec[0][0]))[0], np.where(np.logical_and(spec[0]>spectrum[0][0],spec[0]<spectrum[0][-1]))[0]
+      # if len(IDX)<len(idx): low_res, highres = [i[IDX] for i in spectrum], rebin_spec([i[idx] for i in spec], spectrum[0][IDX])
+      # else: low_res, high_res, IDX = rebin_spec([i[IDX] for i in spectrum], spec[0][idx]), [i[idx] for i in spec], idx
+      low_res, high_res = [i[IDX] for i in spectrum], rebin_spec([i[idx] for i in spec], spectrum[0][IDX])
+      mean_spec = [spectrum[0][IDX], np.array([np.average([hf,lf], weights=[1/he,1/le]) for hf,he,lf,le in zip(high_res[1],high_res[2],low_res[1],low_res[2])]), np.sqrt(low_res[2]**2 + high_res[2]**2)]
+      spec1, spec2 = min(spectrum, spec, key=lambda x: x[0][0]), max(spectrum, spec, key=lambda x: x[0][-1])
+      spec1, spec2 = [i[np.where(spec1[0]<spectrum[0][IDX][0])[0]] for i in spec1], [i[np.where(spec2[0]>spectrum[0][IDX][-1])[0]] for i in spec2]
+      spectrum = [np.concatenate([i[:-1],j[1:-1],k[1:]]) for i,j,k in zip(spec1,mean_spec,spec2)]
+  return spectrum
 
 def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[], trim=[], replace=[], D_Flam=None):
   '''
@@ -354,10 +434,10 @@ def polynomial(n, m, sig='', x='x', y='y', degree=1, c='k', ls='--', lw=2, legen
   p = np.polyfit(np.array(map(float,n)), np.array(map(float,m)), degree, w=1/np.array([i if i else 1 for i in sig]) if sig!='' else None)
   f = np.poly1d(p)
   w = np.linspace(min(n), max(n), 50)
-  ax.plot(w, f(w), c=c, ls=ls, lw=lw, label='${}$'.format(poly_print(p, x=x, y=y)) if legend else '', zorder=-1)
+  ax.plot(w, f(w), c=c, ls=ls, lw=lw, label='${}$'.format(poly_print(p, x=x, y=y)) if legend else '', zorder=10)
   print poly_print(p, x=x, y=y)
 
-def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3f}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
+def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3e}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
 
 def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], skip=[], empties=False, title=False):
   '''
@@ -469,11 +549,13 @@ def specType(SpT):
   *SpT*
     Float spectral type between 0.0 and 39.9 or letter/number spectral type between M0.0 and Y9.9
   '''
+  try: SpT = SpT.replace('J','')
+  except: pass
   if isinstance(SpT,str) and SpT[0] in ['M','L','T','Y'] and float(SpT[1:]) < 10:
     try: return [l+float(SpT[1:]) for m,l in zip(['M','L','T','Y'],[0,10,20,30]) if m == SpT[0]][0]
     except ValueError: print "Spectral type must be a float between 0 and 40 or a string of class M, L, T or Y."
-  elif isinstance(SpT,float) or isinstance(SpT,int) and 0.0 <= SpT < 40.0: return '{}{}'.format('MLTY'[int(SpT//10)], SpT % 10.)
-  else: return SpT
+  elif isinstance(SpT,float) or isinstance(SpT,int) and 0.0 <= SpT < 40.0: return '{}{}'.format('MLTY'[int(SpT//10)], SpT%10)
+  else: return SpT if not SpT.endswith('.0') else SpT[:-2]
   
 def str2Q(x,target=''):
   '''
@@ -531,6 +613,8 @@ def tails(spectrum, model, plot=False):
   final = [np.concatenate(i) for i in [[model[0][start],spectrum[0],model[0][end]], [model[1][start],spectrum[1],model[1][end]], [np.zeros(len(start)),spectrum[2],np.zeros(len(end))]]]  
   if plot: plt.loglog(*spectrum[:2]), plt.loglog(model[0],model[1]), plt.loglog(*final[:2], color='k', ls='--')
   return final
+
+def trim_spectrum(spectrum, regions): return [i[idx_exclude(spectrum[0], regions)] for i in spectrum]
 
 def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False, obj_col=0, key_row=0, start=1):
   '''
