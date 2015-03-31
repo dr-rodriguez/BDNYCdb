@@ -18,26 +18,26 @@ def filter_info(band):
               "R":       { 'eff': 0.641420, 'min': 0.550435, 'max': 0.883333, 'zp': 2.157178e-09, 'zp_photon': 6.971704e+02, 'toVega':0.0018, 'ext': 0.83,   'system': 'Bessel' },
               "I":       { 'eff': 0.797880, 'min': 0.704167, 'max': 0.916667, 'zp': 1.132454e-09, 'zp_photon': 4.549636e+02, 'toVega':-0.0014,'ext': 0.61,   'system': 'Bessel' },
               "u":       { 'eff': 0.3543,   'min': 0.304828, 'max': 0.402823, 'zp': 3.617963e-09, 'zp_photon': 6.546739e+02, 'toVega':0.91,   'ext': 1.58,   'system': 'SDSS' },  # AB to Vega transformations from Blanton et al. (2007)
-              "g":       { 'eff': 0.4770,   'min': 0.378254, 'max': 0.554926, 'zp': 5.491077e-09, 'zp_photon': 1.282871e+03, 'toVega':-0.08,  'ext': 1.23,   'system': 'SDSS' },
-              "r":       { 'eff': 0.6231,   'min': 0.541534, 'max': 0.698914, 'zp': 2.528924e-09, 'zp_photon': 7.794385e+02, 'toVega':0.16,   'ext': 0.89,   'system': 'SDSS' }, 
-              "i":       { 'eff': 0.7625,   'min': 0.668947, 'max': 0.838945, 'zp': 1.409436e-09, 'zp_photon': 5.278550e+02, 'toVega':0.37,   'ext': 0.68,   'system': 'SDSS' }, 
-              "z":       { 'eff': 0.9134,   'min': 0.796044, 'max': 1.083325, 'zp': 8.501067e-10, 'zp_photon': 3.807540e+02, 'toVega':0.54,   'ext': 0.52,   'system': 'SDSS' }, 
-              "J":       { 'eff': 1.2350,   'min': 1.080647, 'max': 1.406797, 'zp': 3.142399e-10, 'zp_photon': 1.943482e+02, 'toVega':0,      'ext': 0.0166, 'system': '2MASS' },
-              "H":       { 'eff': 1.6620,   'min': 1.478738, 'max': 1.823102, 'zp': 1.144108e-10, 'zp_photon': 9.437966e+01, 'toVega':0,      'ext': 0.0146, 'system': '2MASS' },
-              "Ks":      { 'eff': 2.1590,   'min': 1.954369, 'max': 2.355240, 'zp': 4.305500e-11, 'zp_photon': 4.664740e+01, 'toVega':0,      'ext': 0.0710, 'system': '2MASS' },
+              "g":       { 'eff': 0.4770,   'min': 0.378254, 'max': 0.554926, 'zp': 5.491077e-09, 'zp_photon': 1.282871e+03, 'toVega':-0.08,  'ext': 1.23,   'system': 'SDSS' },  # AB to Vega transformations from Blanton et al. (2007)
+              "r":       { 'eff': 0.6231,   'min': 0.541534, 'max': 0.698914, 'zp': 2.528924e-09, 'zp_photon': 7.794385e+02, 'toVega':0.16,   'ext': 0.89,   'system': 'SDSS' },  # AB to Vega transformations from Blanton et al. (2007)
+              "i":       { 'eff': 0.7625,   'min': 0.668947, 'max': 0.838945, 'zp': 1.409436e-09, 'zp_photon': 5.278550e+02, 'toVega':0.37,   'ext': 0.68,   'system': 'SDSS' },  # AB to Vega transformations from Blanton et al. (2007)
+              "z":       { 'eff': 0.9134,   'min': 0.796044, 'max': 1.083325, 'zp': 8.501067e-10, 'zp_photon': 3.807540e+02, 'toVega':0.54,   'ext': 0.52,   'system': 'SDSS' },  # AB to Vega transformations from Blanton et al. (2007)
+              "J":       { 'eff': 1.2350,   'min': 1.080647, 'max': 1.406797, 'zp': 3.129e-10,    'zp_photon': 1.943482e+02, 'toVega':0,      'ext': 0.0166, 'system': '2MASS' }, # ZP from Cohen et al. (2003)
+              "H":       { 'eff': 1.6620,   'min': 1.478738, 'max': 1.823102, 'zp': 1.133e-10,    'zp_photon': 9.437966e+01, 'toVega':0,      'ext': 0.0146, 'system': '2MASS' }, # ZP from Cohen et al. (2003)
+              "Ks":      { 'eff': 2.1590,   'min': 1.954369, 'max': 2.355240, 'zp': 4.283e-11,    'zp_photon': 4.664740e+01, 'toVega':0,      'ext': 0.0710, 'system': '2MASS' }, # ZP from Cohen et al. (2003)
               "MKO_Y":   { 'eff': 1.02894,  'min': 0.9635,   'max': 1.1025,   'zp': 5.869238e-10, 'zp_photon': 3.033632e+02, 'toVega':0,      'ext': 0.41,   'system': 'MKO' },
-              "MKO_J":   { 'eff': 1.241608, 'min': 1.148995, 'max': 1.348332, 'zp': 3.039113e-10, 'zp_photon': 1.899569e+02, 'toVega':0,      'ext': 0.30,   'system': 'MKO' },
-              "MKO_H":   { 'eff': 1.615118, 'min': 1.450318, 'max': 1.808855, 'zp': 1.200622e-10, 'zp_photon': 9.761983e+01, 'toVega':0,      'ext': 0.20,   'system': 'MKO' },
-              "MKO_K":   { 'eff': 2.181858, 'min': 1.986393, 'max': 2.397097, 'zp': 4.086496e-11, 'zp_photon': 4.488476e+01, 'toVega':0,      'ext': 0.12,   'system': 'MKO' },
-              "MKO_L'":  { 'eff': 3.732206, 'min': 3.326622, 'max': 4.207764, 'zp': 5.432588e-12, 'zp_photon': 1.016455e+01, 'toVega':0,      'ext': 0.06,   'system': 'MKO' },
-              "MKO_M'":  { 'eff': 4.664426, 'min': 4.496502, 'max': 4.865044, 'zp': 2.251493e-12, 'zp_photon': 5.305197e+00, 'toVega':0,      'ext': 0.05,   'system': 'MKO' },
+              "MKO_J":   { 'eff': 1.250,    'min': 1.148995, 'max': 1.348332, 'zp': 3.01e-10,     'zp_photon': 1.899569e+02, 'toVega':0,      'ext': 0.30,   'system': 'MKO' },   # eff and ZP from Tokunaga & Vacca (2005)
+              "MKO_H":   { 'eff': 1.644,    'min': 1.450318, 'max': 1.808855, 'zp': 1.18e-10,     'zp_photon': 9.761983e+01, 'toVega':0,      'ext': 0.20,   'system': 'MKO' },   # eff and ZP from Tokunaga & Vacca (2005)
+              "MKO_K":   { 'eff': 2.198,    'min': 1.986393, 'max': 2.397097, 'zp': 4.00e-11,     'zp_photon': 4.488476e+01, 'toVega':0,      'ext': 0.12,   'system': 'MKO' },   # eff and ZP from Tokunaga & Vacca (2005)
+              "MKO_L":   { 'eff': 3.754,    'min': 3.326622, 'max': 4.207764, 'zp': 5.31e-12,     'zp_photon': 1.016455e+01, 'toVega':0,      'ext': 0.06,   'system': 'MKO' },   # eff and ZP from Tokunaga & Vacca (2005)
+              "MKO_M":   { 'eff': 4.702,    'min': 4.496502, 'max': 4.865044, 'zp': 2.22e-12,     'zp_photon': 5.305197e+00, 'toVega':0,      'ext': 0.05,   'system': 'MKO' },   # eff and ZP from Tokunaga & Vacca (2005)
               "DENIS_I": { 'eff': 0.78621,  'min': 0.7007,   'max': 0.9140,   'zp': 1.182102e-09, 'zp_photon': 4.681495e+02, 'toVega':0,      'ext': 0.63,   'system': 'DENIS' },
               "DENIS_J": { 'eff': 1.22106,  'min': 1.0508,   'max': 1.3980,   'zp': 3.190256e-10, 'zp_photon': 1.961698e+02, 'toVega':0,      'ext': 0.31,   'system': 'DENIS' },
               "DENIS_Ks":{ 'eff': 2.14650,  'min': 1.9474,   'max': 2.3979,   'zp': 4.341393e-11, 'zp_photon': 4.691482e+01, 'toVega':0,      'ext': 0.13,   'system': 'DENIS' },              
-              "W1":      { 'eff': 3.4,      'min': 2.754097, 'max': 3.872388, 'zp': 8.238154e-12, 'zp_photon': 1.375073e+01, 'toVega':0,      'ext': 0.07,   'system': 'WISE' },
-              "W2":      { 'eff': 4.6,      'min': 3.963326, 'max': 5.341360, 'zp': 2.431417e-12, 'zp_photon': 5.586982e+00, 'toVega':0,      'ext': 0.05,   'system': 'WISE' },
-              "W3":      { 'eff': 12,       'min': 7.443044, 'max': 17.26134, 'zp': 6.569758e-14, 'zp_photon': 3.567555e-01, 'toVega':0,      'ext': 0.06,   'system': 'WISE' },
-              "W4":      { 'eff': 22,       'min': 19.52008, 'max': 27.91072, 'zp': 4.994767e-15, 'zp_photon': 5.510352e-02, 'toVega':0,      'ext': 0.02,   'system': 'WISE' },
+              "W1":      { 'eff': 3.3526,   'min': 2.754097, 'max': 3.872388, 'zp': 8.1787e-12,   'zp_photon': 1.375073e+01, 'toVega':0,      'ext': 0.07,   'system': 'WISE' }, # eff and ZP from Jarrett et al. (2011)
+              "W2":      { 'eff': 4.6028,   'min': 3.963326, 'max': 5.341360, 'zp': 2.4150e-12,   'zp_photon': 5.586982e+00, 'toVega':0,      'ext': 0.05,   'system': 'WISE' }, # eff and ZP from Jarrett et al. (2011)
+              "W3":      { 'eff': 11.5608,  'min': 7.443044, 'max': 17.26134, 'zp': 6.5151e-14,   'zp_photon': 3.567555e-01, 'toVega':0,      'ext': 0.06,   'system': 'WISE' }, # eff and ZP from Jarrett et al. (2011)
+              "W4":      { 'eff': 22.0883,  'min': 19.52008, 'max': 27.91072, 'zp': 5.0901e-15,   'zp_photon': 5.510352e-02, 'toVega':0,      'ext': 0.02,   'system': 'WISE' }, # eff and ZP from Jarrett et al. (2011)
               "[3.6]":   { 'eff': 3.507511, 'min': 3.129624, 'max': 3.961436, 'zp': 6.755364e-12, 'zp_photon': 1.192810e+01, 'toVega':0,      'ext': 0.07,   'system': 'IRAC' },
               "[4.5]":   { 'eff': 4.436578, 'min': 3.917328, 'max': 5.056057, 'zp': 2.726866e-12, 'zp_photon': 6.090264e+00, 'toVega':0,      'ext': 0.05,   'system': 'IRAC' },
               "[5.8]":   { 'eff': 5.628102, 'min': 4.898277, 'max': 6.508894, 'zp': 1.077512e-12, 'zp_photon': 3.052866e+00, 'toVega':0,      'ext': 0.04,   'system': 'IRAC' },
@@ -210,7 +210,7 @@ def specType(SpT):
   '''
   (By Joe Filippazzo)
   
-  Converts between float and letter/number M, L, T and Y spectral types (e.g. 14.5 => 'L4.5' and 'T3' => 23).
+  Converts between float and letter M, L, T and Y spectral types (e.g. 14.5 => 'L4.5' and 'T3' => 23).
   
   *SpT*
     Float spectral type between 0.0 and 39.9 or letter/number spectral type between M0.0 and Y9.9
@@ -221,7 +221,7 @@ def specType(SpT):
     except ValueError:
       print "Spectral type must be a float between 0 and 40 or a string of class M, L, T or Y."
   elif isinstance(SpT,float) or isinstance(SpT,int) and 0.0 <= SpT < 40.0:
-    return '{}{}'.format('MLTY'[int(SpT//10)], SpT % 10.)
+    return '{}{}'.format('MLTY'[int(SpT//10)], (int(SpT) if int(SpT)==SpT and isinstance(SpT, float) else SpT) % 10)
   else:
     return SpT
  

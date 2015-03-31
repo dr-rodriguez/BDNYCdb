@@ -82,7 +82,7 @@ class get_db:
     except IOError: 
       print "Couldn't add spectrum to database."
 
-  def add_fits(self, fitsPath, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', wlog=False, SDSS=False):
+  def add_fits(self, fitsPath, source_id, unc_fitsPath='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', wlog=False, SDSS=False):
     '''
     Checks the header of the **fitsFile** and inserts the data with **source_id**.
     '''
@@ -115,7 +115,7 @@ class get_db:
     if not telescope_id:
       try:
         n = header['TELESCOP'].lower() if isinstance(header['TELESCOP'],str) else ''
-        telescope_id = 5 if 'hst' in n else 6 if 'spitzer' in n else 7 if 'irtf' in n else 9 if 'keck' in n and 'ii' in n else 8 if 'keck' in n and 'i' in n else 10 if 'kp' in n and '4' in n else 11 if 'kp' in n and '2' in n else 12 if 'bok' in n else 13 if 'mmt' in n else 14 if 'ctio' in n and '1' in n else 15 if 'ctio' in n and '4' in n else 16 if 'gemini' in n and 'north' in n else 17 if 'gemini' in n and 'south' in n else 18 if 'vlt' in n else 19 if '3.5m' in n else 20 if 'subaru' in n else header['TELESCOP']
+        telescope_id = 5 if 'hst' in n else 6 if 'spitzer' in n else 7 if 'irtf' in n else 9 if 'keck' in n and 'ii' in n else 8 if 'keck' in n and 'i' in n else 10 if 'kp' in n and '4' in n else 11 if 'kp' in n and '2' in n else 12 if 'bok' in n else 13 if 'mmt' in n else 14 if 'ctio' in n and '1' in n else 15 if 'ctio' in n and '4' in n else 16 if 'gemini' in n and 'north' in n else 17 if 'gemini' in n and 'south' in n else 18 if 'vlt' in n else 19 if '3.5m' in n else 20 if 'subaru' in n else 21 if ('mag' in n and 'ii' in n) or ('clay' in n) else 22 if ('mag' in n and 'i' in n) or ('baade' in n) else None
       except KeyError: telescope_id = ''
     if not instrument_id:
       try: 
@@ -133,13 +133,14 @@ class get_db:
       else:
         data = a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0]
         wav, flx = data[:2]
-        try: err = data[2]
+        try: err = a.read_spec(unc_fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0][1] if unc_fitsPath else data[2]
         except: err = ''
       try: snr = flx/err if any(flx) and any(err) else None
       except (TypeError,IndexError): snr = None
 
-      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
-      else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None     
+      if not regime:
+        if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
+        else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None     
 
       spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
       self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
@@ -187,14 +188,42 @@ class get_db:
       print '\nAborted merge of {} table. Undoing all changes.\n'.format(table.upper())
       return 'abort'
     else: print 'Finished clean up on {} table.'.format(table.upper())
-  
+
+  def edit_columns(self, table, columns, types):
+    '''
+    Rearrange, add or delete columns from database **table** with desired ordered list of **columns** and corresponding data **types**.
+    '''
+    types[0] = 'INTEGER PRIMARY KEY'
+    self.query.execute("ALTER TABLE {0} RENAME TO TempOldTable".format(table)), self.query.execute("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), self.query.execute("INSERT INTO {0} ({1}) SELECT {1} FROM TempOldTable".format(table, ','.join([c for c in list(zip(*self.query.execute("PRAGMA table_info(TempOldTable)").fetchall())[1]) if c in columns]))), self.query.execute("DROP TABLE TempOldTable")
+    
+  def header(self, spectrum_id_or_path):
+    '''
+    Prints the header information for the given **spectrum_id_or_path**.
+    '''
+    if isinstance(spectrum_id_or_path,int):
+      try: 
+        H = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id_or_path)).fetchone()['header']
+        if H: return H
+        else: print 'No header for spectrum {}'.format(spectrum_id_or_path)
+      except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
+    elif os.path.isfile(spectrum_id_or_path):
+      if spectrum_id_or_path.endswith('.fits'):
+        return pf.getheader(spectrum_id_or_path)
+      else:
+        txt, H = open(spectrum_id_or_path), []
+        for i in txt: 
+          if i.startswith('#'): H.append(i)
+        txt.close()
+        print ''.join(H) if H else 'No header for spectrum {}'.format(spectrum_id_or_path)
+    else: print 'No such file {}'.format(spectrum_id_or_path)
+
   def identify(self, search):
     '''
     For **search** input of (ra,dec) decimal degree tuple, i.e. '(12.3456,-65.4321)', returns all sources within 1 arcminute.
     For **search** input of text string, i.e. 'vb10', returns all sources with case-insensitive partial text matches in *names* or *designation* columns.
     '''
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
-    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,components,companions,names FROM sources WHERE names like '%"+search+"%' or designation like '%"+search+"%' or unum like '%"+search+"%' or shortname like '%"+search+"%'"
+    except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,components,companions,names FROM sources WHERE REPLACE(names,' ','') like '%"+search.replace(' ','')+"%' or designation like '%"+search+"%' or unum like '%"+search+"%' or shortname like '%"+search+"%'"
     results = self.query.execute(q).fetchall()
     if results: 
       if len(results)==1: self.inventory(int(results[0][0]))
@@ -216,8 +245,8 @@ class get_db:
             data = map(list, self.query.execute("SELECT * FROM {} WHERE {}".format(table,'id={}'.format(ID) if table=='sources' else 'source_id={}'.format(ID))).fetchall())
             for d in data+[columns,types]:
               if table!='sources': d.pop(1)
-              if table=='spectra': d.pop(1), d.pop(2), d.pop(3), d.pop(3)
-            if data: u.printer([c.replace('wavelength_units','W').replace('flux_units','F').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('lication_id','').replace('rument_id','').replace('escope_id','') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=20 if table=='sources' else 50, title=table.upper(), empties=True)
+              if table=='spectra': d.pop(1), d.pop(2), d.pop(3), d.pop(3), d.pop(-4)
+            if data: u.printer([c.replace('wavelength_units','W').replace('flux_units','F').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('lication_id','').replace('rument_id','').replace('escope_id','').replace('mode_id','mode') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=20 if table=='sources' else 50, title='SOURCE: '+data[0][-3] if table=='sources' else table.upper(), empties=True)
       else:
         try:
           D = self.query.execute(q+' WHERE id IN ({})'.format("'"+"','".join(map(str,IDS))+"'")).fetchall()
@@ -229,27 +258,6 @@ class get_db:
       if plot:
         for I in IDS:
           for i in self.dict.execute("SELECT * FROM spectra WHERE source_id={}".format(I)).fetchall(): self.plot_spectrum(i['id'])
-            
-  def header(self, spectrum_id_or_path):
-    '''
-    Prints the header information for the given **spectrum_id_or_path**.
-    '''
-    if isinstance(spectrum_id_or_path,int):
-      try: 
-        H = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id_or_path)).fetchone()['header']
-        if H: return H
-        else: print 'No header for spectrum {}'.format(spectrum_id_or_path)
-      except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
-    elif os.path.isfile(spectrum_id_or_path):
-      if spectrum_id_or_path.endswith('.fits'):
-        return pf.getheader(spectrum_id_or_path)
-      else:
-        txt, H = open(spectrum_id_or_path), []
-        for i in txt: 
-          if i.startswith('#'): H.append(i)
-        txt.close()
-        print ''.join(H) if H else 'No header for spectrum {}'.format(spectrum_id_or_path)
-    else: print 'No such file {}'.format(spectrum_id_or_path)
 
   def merge(self, conflicted, tables=[], diff_only=True):
     '''
@@ -345,32 +353,6 @@ class get_db:
       u.dict2txt({str(w):{'flux [{}]'.format(data['flux_units']):str(f), 'unc [{}]'.format(data['flux_units']):str(e)} for w,f,e in zip(data['wavelength'],data['flux'],data['unc'])}, fn, column1='# wavelength [{}]'.format(data['wavelength_units']), append=True)
     else: print "No spectrum found with id {}".format(spectrum_id)
   
-  def publications(self, name=''): return self.query.execute("SELECT * FROM publications WHERE id={}".format(name)).fetchone() if type(name)==int else self.query.execute("SELECT * FROM publications WHERE shortname LIKE '%{0}%' OR description LIKE '%{0}%'".format(name)).fetchall()
-    
-  def telescopes(self, name=''): return self.query.execute("SELECT * FROM telescopes WHERE name LIKE '%{}%'".format(name)).fetchall()
-
-  def instruments(self, name=''): return self.query.execute("SELECT * FROM instruments WHERE name LIKE '%{}%'".format(name)).fetchall()
-
-  def systems(self, name=''): return self.query.execute("SELECT * FROM systems WHERE name LIKE '%{}%'".format(name)).fetchall()
-
-  def modes(self, name=''): return self.query.execute("SELECT * FROM modes WHERE mode LIKE '%{}%'".format(name)).fetchall()
-    
-  def fix_publications(self):
-    '''
-    Runs through all tables and changes publication shortname (i.e. Rice10) to correct publication_id. If that shortname is not in the publications table, it assigns a new publication_id.
-    '''
-    pubs = {j:i for i,j in self.query.execute("SELECT id,shortname FROM publications").fetchall()}
-    for table in zip(*self.query.execute("SELECT * FROM sqlite_master WHERE type='table'").fetchall())[1]:
-      if 'publication_id' in zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1]:
-        print "Fixing publication_ids in {}".format(table.upper())
-        for ID,short in self.query.execute("SELECT id,publication_id FROM {}".format(table)).fetchall():
-          if isinstance(short,str) and short:
-            if short.lower() in [i.lower() for i in pubs.keys()]: self.query.execute("UPDATE {} SET publication_id={} WHERE id={}".format(table,pubs[[i for i in pubs.keys() if i.lower()==short.lower()][0]],ID)), self.modify.commit()
-            else:
-              self.query.execute("INSERT INTO publications VALUES(?, ?, ?, ?, ?)", (None, None, short, None, None)), self.modify.commit()
-              pubs = {j:i for i,j in self.query.execute("SELECT id,shortname FROM publications").fetchall()}
-              self.query.execute("UPDATE {} SET publication_id={} WHERE id={}".format(table,pubs[short],ID)), self.modify.commit()
-
   def plot_spectrum(self, ID):
     '''
     Plots spectrum **ID** from SPECTRA table.
@@ -382,15 +364,21 @@ class get_db:
         X, Y = plt.xlim(), plt.ylim()
         try: plt.fill_between(i['wavelength'], i['flux']-i['unc'], i['flux']+i['unc'], color='b', alpha=0.3), plt.xlim(X), plt.ylim(Y)
         except TypeError: print 'No uncertainty array for spectrum {}'.format(ID)
-      except: print "Couldn't print spectrum {}".format(ID)
+      except IOError: print "Couldn't print spectrum {}".format(ID)
     else: print "No spectrum {} in the SPECTRA table.".format(ID)
 
-  def edit_columns(self, table, columns, types):
+  def lookup(self, table, ids=None, concatenate='', delim='/'):
     '''
-    Rearrange, add or delete columns from database **table** with desired ordered list of **columns** and corresponding data **types**.
+    Quickly look up records from the specified *table* and list *ids* to limit results. Specify column values to *concatenate* into a string.
     '''
-    types[0] = 'INTEGER PRIMARY KEY'
-    self.query.execute("ALTER TABLE {0} RENAME TO TempOldTable".format(table)), self.query.execute("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), self.query.execute("INSERT INTO {0} ({1}) SELECT {1} FROM TempOldTable".format(table, ','.join([c for c in list(zip(*self.query.execute("PRAGMA table_info(TempOldTable)").fetchall())[1]) if c in columns]))), self.query.execute("DROP TABLE TempOldTable")
+    if type(ids)==str and table.lower()=='publications' and ',' not in ids:
+      return self.query.execute("SELECT * FROM publications WHERE shortname LIKE '%{0}%' OR description LIKE '%{0}%'".format(ids)).fetchall()
+    else:
+      if type(ids)==int: ids = [ids]
+      if type(ids)==str and ',' in ids: ids = ids.split(',')
+      if type(ids)==list and not ids: ids = ''
+      results = self.query.execute("SELECT {} FROM {} WHERE id IN ({})".format(concatenate or '*',table, ','.join(map(str,ids)))).fetchall() if ids else self.query.execute("SELECT * FROM {}".format(table)).fetchall()
+      return '' if not results else delim.join(map(str,zip(*results)[0])) if concatenate else results
 
 # ==============================================================================================================================================
 # ================================= Adapters and converters for special data types =============================================================

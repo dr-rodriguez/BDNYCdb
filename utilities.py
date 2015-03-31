@@ -14,11 +14,6 @@ path = '/Users/Joe/Documents/Python/'
 #   elif hasattr(mag,'unit'): return (mag*scale_to/dist).to(mag.unit), (scale_to*np.sqrt((sig_m**2 + (sig_d*mag/dist)**2).to(mag.unit**2))*mag.unit/dist).to(mag.unit) if sig_m!='' and sig_d else ''
 #   else: print 'Could not absolutely flux calibrate that input.'
 
-def flux_calibrate(mag, dist, sig_m='', sig_d='', scale_to=10*q.pc):
-  if isinstance(mag,(float,int)): return [mag-5*np.log10(dist/scale_to), np.sqrt(sig_m**2 + 25*(sig_d/(dist*np.log(10))).value**2) if sig_m and sig_d else '']
-  elif hasattr(mag,'unit'): return [(mag*dist**2/scale_to**2).to(mag.unit), (np.sqrt((sig_m*dist**2)**2 + (2*sig_d*mag*dist)**2)*mag.unit*dist.unit**2/scale_to**2) if sig_m!='' and sig_d else '']
-  else: print 'Could not flux calibrate that input to distance {}.'.format(dist)
-  
 def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
   '''
   Given a wavelength array [um] and temperature [K], returns an array of Planck function values in [erg s-1 cm-2 A-1]
@@ -38,24 +33,36 @@ def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet)
   
 def deg2sxg(ra='', dec=''):
   RA, DEC = '', ''
-  if ra: RA = str(apc.angles.Angle(ra,'degree').format(unit='hour', sep=' ')) 
-  if dec: DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')) 
+  if ra:
+    RA = str(apc.angles.Angle(ra,'degree').format(unit='hour', sep=' '))[:11]
+    if len(RA.split('.')[0])==7: RA = '0'+RA[:-1]
+  if dec: 
+    DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')).replace('-','')[:9 if abs(dec)<10 else 10]
+    DEC = ('-' if dec<0 else '+')+('0' if abs(dec)<10 else '')+DEC[:]
   return (RA, DEC) if ra and dec else RA or DEC 
   
-def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', colsort='', row2='', empties=True, append=False, all_str=False):
+def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', colsort='', row2='', preamble='', postamble='', empties=True, append=False, all_str=False, literal=False, blanks='-', LaTeX=False):
   '''
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
   '''
   import csv
   D = DICT.copy()
-  with open( writefile, 'a+' if append else 'w' ) as f:
-    writer, w = csv.writer(f, delimiter=delim), []
+  if order:
+    for key,value in D.items():
+      for k,v in value.items(): 
+        if k not in order: value.pop(k)
+  with open( writefile, 'ab' if append else 'w' ) as f:
+    writer, w = csv.writer(f, delimiter=delim, quoting=csv.QUOTE_NONE, escapechar='\r'), []
+    if preamble: writer.writerow([preamble])
     for k in D.keys():
       w.append(k)
       for i in D[k].keys():
-        if hasattr(D[k][i],'unit'): D[k][i] = D[k][i].value
-        if digits: D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) and not all_str else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() and not all_str else str(D[k][i])
-        else: D[k][i] = '-' if not D[k][i] else '{}'.format(D[k][i]) if isinstance(D[k][i],(float,int)) else '{}'.format(float(D[k][i])) if D[k][i].replace('.','').replace('-','').isdigit() and not all_str else str(D[k][i])
+        if literal:
+          D[k][i] = blanks if not D[k][i] else repr(D[k][i]).replace("'",'')
+        else:
+          if hasattr(D[k][i],'unit'): D[k][i] = D[k][i].value
+          if digits: D[k][i] = '-' if not D[k][i] else '{:.{}f}'.format(D[k][i],digits) if isinstance(D[k][i],(float,int)) and not all_str else '{:.{}f}'.format(float(D[k][i]),digits) if D[k][i].replace('.','').replace('-','').isdigit() and not all_str else str(D[k][i])
+          else: D[k][i] = '-' if not D[k][i] else '{}'.format(D[k][i]) if isinstance(D[k][i],(float,int)) else '{}'.format(float(D[k][i])) if D[k][i].replace('.','').replace('-','').isdigit() and not all_str else str(D[k][i])
         w.append(i), w.append(str(D[k][i]))
     width = len(max(map(str,w), key=len))
     head = ['{!s:{}}'.format(column1,width)]
@@ -63,8 +70,11 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', cols
     for i in headorder: head.append('{!s:{}}'.format(i,width))
     if row2: units = ['{!s:{}}'.format(i,width).strip() for i in row2]
     if delim == ',': head = [i.strip() for i in head]
+    if LaTeX: head[-1] += r'\\' if row2 else r'\\\hline'
     writer.writerow(head)
-    if row2: writer.writerow(units)
+    if row2: 
+      if LaTeX: units[-1] += r'\\\hline'
+      writer.writerow(units)
     
     rows = sorted(D.keys(), key=lambda x: D[x][colsort]) if colsort else sorted(D.keys())
     for i in rows:
@@ -72,18 +82,11 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', cols
       row = ['{!s:{}}'.format(i,width)]
       for k in order:
         if k not in D[i].keys(): D[i][k] = '' if delim==',' else '-'
-        row.append('{!s:{}}'.format(D[i][k],width))
+        row.append(r'{!s:{}}'.format(D[i][k],width))
       if delim == ',': row = [i.strip() for i in row]
-      writer.writerow(row)
-
-    for i in sorted(D.keys()):
-      order = order or sorted(D[i].keys())
-      row = ['{!s:{}}'.format(i,width)]
-      for k in order:
-        if k not in D[i].keys(): D[i][k] = '' if delim==',' else '-'
-        row.append('{!s:{}}'.format(D[i][k],width))
-      if delim == ',': row = [i.strip() for i in row]
-      writer.writerow(row)
+      if LaTeX: row[-1] += r'\\'
+      writer.writerow([r'{}'.format(i) for i in row])
+    if postamble: writer.writerow([postamble])
       
 def distance(coord1, coord2):
   '''
@@ -114,6 +117,11 @@ def find(filename, tree):
         result.append(os.path.join(root, filename))
 
   return result
+
+def flux_calibrate(mag, dist, sig_m='', sig_d='', scale_to=10*q.pc):
+  if isinstance(mag,(float,int)): return [mag-5*np.log10(dist/scale_to), np.sqrt(sig_m**2 + 25*(sig_d/(dist*np.log(10))).value**2) if sig_m and sig_d else '']
+  elif hasattr(mag,'unit'): return [(mag*dist**2/scale_to**2).to(mag.unit), (np.sqrt((sig_m*dist**2)**2 + (2*sig_d*mag*dist)**2)*mag.unit*dist.unit**2/scale_to**2) if sig_m!='' and sig_d else '']
+  else: print 'Could not flux calibrate that input to distance {}.'.format(dist)
 
 def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS']], systems=['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS']):
   '''
@@ -149,7 +157,7 @@ def goodness(spec1, spec2, array=False, exclude=[], filt_dict=None, weighting=Tr
     if exclude: weight[weight>np.std(weight)] = 0
   C = sum(weight*f1*f2/(e1**2 + e2**2))/sum(weight*f2**2/(e1**2 + e2**2))
   G = weight*(f1-f2*C)**2/(e1**2 + e2**2)
-  if verbose: plt.loglog(spec2[0], spec2[1]*C, 'r', label='spec2', alpha=0.6), plt.loglog(w1, f1, 'k', label='spec1', alpha=0.6), plt.loglog(w1, f2*C, 'b', label='spec2 binned', alpha=0.6), plt.grid(True), plt.legend(loc=0)
+  if verbose: plt.figure(), plt.loglog(w1, f1, 'k', label='spec1', alpha=0.6), plt.loglog(w1, f2*C, 'b', label='spec2 binned', alpha=0.6), plt.grid(True), plt.legend(loc=0)
   return [G if array else sum(G), C]
 
 def group(lst, n):
@@ -158,16 +166,31 @@ def group(lst, n):
     if len(val) == n: yield tuple(val)
 
 def idx_include(x, include):
+  if hasattr(x,'unit'): x = x.value
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
   except TypeError:
     try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in [include]])))))[0] 
     except TypeError: return range(len(x))
 
 def idx_exclude(x, exclude):
+  if hasattr(x,'unit'): x = x.value
   try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
   except TypeError: 
     try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
     except TypeError: return range(len(x))
+
+def inject_average(spectrum, position, direction, n=10):
+  '''
+  Used to smooth edges after trimming a spectrum. Injects a new data point into a *spectrum* at given *position* with flux value equal to the average of the *n* elements in the given *direction*.
+  '''
+  units, spectrum, rows = [i.unit if hasattr(i,'unit') else 1 for i in spectrum], [i.value if hasattr(i,'unit') else i for i in spectrum], zip(*[i.value if hasattr(i,'unit') else i for i in spectrum])
+  new_pos = [position, np.interp(position, spectrum[0], spectrum[1]), np.interp(position, spectrum[0], spectrum[2])]
+  rows = sorted(map(list,rows)+[new_pos])
+  sample = [np.array(i) for i in zip(*rows[rows.index(new_pos)-(n if direction=='left' else 0) : rows.index(new_pos)+(n if direction=='right' else 0)])]
+  final_pos = [position, np.average(sample[1], weights=1/sample[2]), np.sqrt(sum(sample[2])**2)]
+  rows[rows.index(new_pos)] = final_pos
+  spectrum = zip(*rows)
+  return [i*j for i,j in zip(units,spectrum)]
 
 def mag2flux(band, mag, sig_m='', photon=False):
   '''
@@ -185,12 +208,12 @@ def flux2mag(band, flux, sig_f='', photon=True):
   sig_F = (2.5/np.log(10))*(sig_f/F).value if sig_f else ''  
   return (F,sig_F)
 
-def manual_legend(new_labels, colors, markers='', edges='', sizes='', errors='', ncol=1, append=False):
-  ax = plt.gca()
+def manual_legend(new_labels, colors, markers='', edges='', sizes='', errors='', ncol=1, append=False, styles='', fontsize=18, overplot=''):
+  ax = overplot or plt.gca()
   old_handles, old_labels = ax.get_legend_handles_labels()
-  new_handles = [plt.errorbar((1,0),(0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m, ls='none', markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors])]
+  new_handles = [plt.errorbar((1,0), (0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m if t=='p' else '', color=c, ls=m if t=='l' else 'none', lw=2, markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r,t in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors], styles or ['p' for i in colors])]
   [i[0].remove() for i in new_handles]
-  ax.legend((old_handles if append else[])+new_handles, (old_labels if append else [])+new_labels, loc=0, frameon=False, numpoints=1, handletextpad=0, handleheight=2, fontsize=20, ncol=ncol)
+  ax.legend((old_handles if append else [])+new_handles, (old_labels if append else [])+new_labels, loc=0, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
 
 def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
@@ -303,13 +326,13 @@ def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=24):
   fig, axes = plt.subplots(rows, columns, sharey=True if columns>1 else False, sharex=True if rows>1 else False, figsize=figsize)
   plt.rc('text', usetex=True, fontsize=fontsize)
   if ylabel:
-    if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical')
+    if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical', fontsize=fontsize+8)
     else:
       if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+8, labelpad=fontsize-8)
       else:
         for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize+8, labelpad=fontsize-8)
   if xlabel:
-    if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center')
+    if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center', fontsize=fontsize+8)
     else:
       if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+8, labelpad=fontsize-8)
       else:
@@ -423,19 +446,24 @@ def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[],
     return normalized[0][:len(template)] if composite else normalized
   else: return [W,F,E]
 
-def pi2pc(parallax): 
-  if isinstance(parallax,(tuple,list)):
-    pi, sig_pi = parallax[0]*q.arcsec/1000., parallax[1]*q.arcsec/1000.
-    d, sig_d = (1*q.pc*q.arcsec)/pi, sig_pi*q.pc*q.arcsec/pi**2
-    return (d, sig_d)
-  else: return (1*q.pc*q.arcsec)/(parallax*q.arcsec/1000.)
+def pi2pc(parallax, parallax_unc=0, pc2pi=False):
+  if parallax: 
+    if pc2pi:
+      return ((1*q.pc*q.arcsec)/parallax).to(q.mas), (parallax_unc*q.pc*q.arcsec/parallax**2).to(q.mas)
+    else:
+      pi, sig_pi = parallax*q.arcsec/1000., parallax_unc*q.arcsec/1000.
+      d, sig_d = (1*q.pc*q.arcsec)/pi, sig_pi*q.pc*q.arcsec/pi**2
+      return (d, sig_d)
+  else: return ['','']
 
-def polynomial(n, m, sig='', x='x', y='y', degree=1, c='k', ls='--', lw=2, legend=True, ax=''):
-  p = np.polyfit(np.array(map(float,n)), np.array(map(float,m)), degree, w=1/np.array([i if i else 1 for i in sig]) if sig!='' else None)
+def polynomial(n, m, sig='', x='x', y='y', title='', degree=1, c='k', ls='--', lw=2, legend=True, ax='', output_data=False):
+  p, residuals, rank, singular_values, rcond = np.polyfit(np.array(map(float,n)), np.array(map(float,m)), degree, w=1/np.array([i if i else 1 for i in sig]) if sig!='' else None, full=True)
   f = np.poly1d(p)
   w = np.linspace(min(n), max(n), 50)
   ax.plot(w, f(w), c=c, ls=ls, lw=lw, label='${}$'.format(poly_print(p, x=x, y=y)) if legend else '', zorder=10)
-  print poly_print(p, x=x, y=y)
+  data = [[y,x,'{:.3f}'.format(float(np.sqrt(residuals/len(n))))]+['{:.3e}'.format(v) for v in list(reversed(p))]]
+  printer(['P(x)','x','rms']+[r'$c_{}$'.format(str(i)) for i in range(len(p))], data, title=title, to_txt='/Users/Joe/Desktop/{} v {}.txt'.format(x,y) if output_data else False)
+  return data
 
 def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3e}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
 
@@ -549,13 +577,13 @@ def specType(SpT):
   *SpT*
     Float spectral type between 0.0 and 39.9 or letter/number spectral type between M0.0 and Y9.9
   '''
-  try: SpT = SpT.replace('J','')
-  except: pass
-  if isinstance(SpT,str) and SpT[0] in ['M','L','T','Y'] and float(SpT[1:]) < 10:
+  if isinstance(SpT,str) and SpT[0] in ['M','L','T','Y']:
     try: return [l+float(SpT[1:]) for m,l in zip(['M','L','T','Y'],[0,10,20,30]) if m == SpT[0]][0]
-    except ValueError: print "Spectral type must be a float between 0 and 40 or a string of class M, L, T or Y."
-  elif isinstance(SpT,float) or isinstance(SpT,int) and 0.0 <= SpT < 40.0: return '{}{}'.format('MLTY'[int(SpT//10)], SpT%10)
-  else: return SpT if not SpT.endswith('.0') else SpT[:-2]
+    except: print "Spectral type must be a float between 0 and 40 or a string of class M, L, T or Y."; return SpT
+  elif isinstance(SpT,float) or isinstance(SpT,int) and 0.0 <= SpT < 40.0: 
+    try: return '{}{}'.format('MLTY'[int(SpT//10)], int(SpT%10) if SpT%10==int(SpT%10) else SpT%10)
+    except: print "Spectral type must be a float between 0 and 40 or a string of class M, L, T or Y."; return SpT
+  else: return SpT
   
 def str2Q(x,target=''):
   '''
@@ -614,7 +642,14 @@ def tails(spectrum, model, plot=False):
   if plot: plt.loglog(*spectrum[:2]), plt.loglog(model[0],model[1]), plt.loglog(*final[:2], color='k', ls='--')
   return final
 
-def trim_spectrum(spectrum, regions): return [i[idx_exclude(spectrum[0], regions)] for i in spectrum]
+def trim_spectrum(spectrum, regions, smooth_edges=10):
+  units, spectrum = [i.unit if hasattr(i,'unit') else 1 for i in spectrum], [i.value if hasattr(i,'unit') else i for i in spectrum]
+  trimmed_spec = [i[idx_exclude(spectrum[0], regions)] for i in spectrum]
+  if smooth_edges: 
+    for r in regions: 
+      if any(spectrum[0][spectrum[0]>r[1]]): trimmed_spec = inject_average(trimmed_spec, r[1], 'right', n=smooth_edges)
+      if any(spectrum[0][spectrum[0]<r[0]]): trimmed_spec = inject_average(trimmed_spec, r[0], 'left', n=smooth_edges)
+  return [np.array(i)*j for i,j in zip(units,trimmed_spec)]
 
 def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False, obj_col=0, key_row=0, start=1):
   '''
