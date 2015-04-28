@@ -5,7 +5,6 @@ from random import random
 from heapq import nsmallest, nlargest
 from scipy.interpolate import Rbf
 from pysynphot import observation
-from pysynphot import spectrum
 warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
@@ -34,14 +33,23 @@ def contour_plot(x, y, z, best=False, figsize=(8,8), levels=20, cmap=plt.cm.jet)
 def deg2sxg(ra='', dec=''):
   RA, DEC = '', ''
   if ra:
-    RA = str(apc.angles.Angle(ra,'degree').format(unit='hour', sep=' '))[:11]
-    if len(RA.split('.')[0])==7: RA = '0'+RA[:-1]
+    ra /= 15.
+    RA = ['{:.2f}'.format(float(i)) if '.' in i else str(int(abs(float(i)))) for i in str(apc.angles.Angle(apc.angles.Angle(ra, 'degree'))).replace('d',' ').replace('m',' ').replace('s',' ').split()]
+    for n,i in enumerate(RA):
+      if len(i.split('.')[0])==1: RA[n] = '0'+RA[n]
+    RA = ' '.join(RA)
+  
   if dec: 
-    DEC = str(apc.angles.Angle(dec,'degree').format(unit='degree', sep=' ')).replace('-','')[:9 if abs(dec)<10 else 10]
-    DEC = ('-' if dec<0 else '+')+('0' if abs(dec)<10 else '')+DEC[:]
+    DEC = ['{:.1f}'.format(float(i)) if '.' in i else str(int(abs(float(i)))) for i in str(apc.angles.Angle(dec, 'degree')).replace('d',' ').replace('m',' ').replace('s',' ').split()]
+    for n,i in enumerate(DEC):
+      if len(i.split('.')[0])==1: DEC[n] = '0'+DEC[n]
+      if len(i.split('.')[-1])==2 and n==2: DEC[n] = DEC[n]+'.0'
+    DEC = ' '.join(DEC)
+    DEC = ('-' if dec<0 else '+')+DEC
+    
   return (RA, DEC) if ra and dec else RA or DEC 
   
-def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', colsort='', row2='', preamble='', postamble='', empties=True, append=False, all_str=False, literal=False, blanks='-', LaTeX=False):
+def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', colsort='', row2='', preamble='', postamble='', empties=True, append=False, all_str=False, literal=False, blanks=r'\\nodata', LaTeX=False):
   '''
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
   '''
@@ -70,22 +78,26 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', cols
     for i in headorder: head.append('{!s:{}}'.format(i,width))
     if row2: units = ['{!s:{}}'.format(i,width).strip() for i in row2]
     if delim == ',': head = [i.strip() for i in head]
-    if LaTeX: head[-1] += r'\\' if row2 else r'\\\hline'
+    if LaTeX: 
+      head[0] = r'\tablehead{'+head[0]
+      if row2: units[-1] = units[-1]+r'}\startdata'
+      else: head[-1] = head[-1]+r'}\startdata'
     writer.writerow(head)
     if row2: 
-      if LaTeX: units[-1] += r'\\\hline'
       writer.writerow(units)
     
     rows = sorted(D.keys(), key=lambda x: D[x][colsort]) if colsort else sorted(D.keys())
-    for i in rows:
+    for n,i in enumerate(rows):
       order = order or sorted(D[i].keys())
       row = ['{!s:{}}'.format(i,width)]
       for k in order:
         if k not in D[i].keys(): D[i][k] = '' if delim==',' else '-'
         row.append(r'{!s:{}}'.format(D[i][k],width))
       if delim == ',': row = [i.strip() for i in row]
-      if LaTeX: row[-1] += r'\\'
+      if LaTeX and n!=len(rows)-1: row[-1] += r'\\'
       writer.writerow([r'{}'.format(i) for i in row])
+    if LaTeX: writer.writerow([r'\enddata'])
+
     if postamble: writer.writerow([postamble])
       
 def distance(coord1, coord2):
@@ -119,11 +131,15 @@ def find(filename, tree):
   return result
 
 def flux_calibrate(mag, dist, sig_m='', sig_d='', scale_to=10*q.pc):
-  if isinstance(mag,(float,int)): return [mag-5*np.log10(dist/scale_to), np.sqrt(sig_m**2 + 25*(sig_d/(dist*np.log(10))).value**2) if sig_m and sig_d else '']
-  elif hasattr(mag,'unit'): return [(mag*dist**2/scale_to**2).to(mag.unit), (np.sqrt((sig_m*dist**2)**2 + (2*sig_d*mag*dist)**2)*mag.unit*dist.unit**2/scale_to**2) if sig_m!='' and sig_d else '']
+  # if isinstance(mag,(float,int)): return [mag-5*np.log10(dist/scale_to), np.sqrt(sig_m**2 + 25*(sig_d/(dist*np.log(10))).value**2) if sig_m and sig_d else '']
+  # elif hasattr(mag,'unit'): return [(mag*dist**2/scale_to**2).to(mag.unit), (np.sqrt((sig_m*dist**2)**2 + (2*sig_d*mag*dist)**2)*mag.unit*dist.unit**2/scale_to**2) if sig_m!='' and sig_d else '']
+  # else: print 'Could not flux calibrate that input to distance {}.'.format(dist)
+  
+  if isinstance(mag,(float,int)): return [mag-5*np.log10((dist.to(q.pc)/scale_to.to(q.pc)).value), np.sqrt(sig_m**2 + 25*(sig_d.to(q.pc)/(dist.to(q.pc)*np.log(10))).value**2) if sig_m and sig_d else '']
+  elif hasattr(mag,'unit'): return [mag*(dist/scale_to).value**2, np.sqrt((sig_m*(dist/scale_to).value)**2 + (2*mag*(sig_d*dist/scale_to**2).value)**2) if sig_m!='' and sig_d else '']
   else: print 'Could not flux calibrate that input to distance {}.'.format(dist)
 
-def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS']], systems=['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS']):
+def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA']], systems=['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA']):
   '''
   Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1]. 
   '''
@@ -133,12 +149,13 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
   else:
     filters = {}
     for filepath in files:
-      filter_name = os.path.splitext(os.path.basename(filepath))[0]
-      RSR_x, RSR_y = [np.array(map(float,i)) for i in zip(*txt2dict(filepath,to_list=True,skip=['#']))]
-      RSR_x, RSR_y = (RSR_x*(q.um if min(RSR_x)<100 else q.AA)).to(q.um), RSR_y*q.um/q.um
-      Filt = a.filter_info(filter_name)
-      filters[filter_name] = {'wav':RSR_x, 'rsr':RSR_y, 'system':Filt['system'], 'eff':Filt['eff']*q.um, 'min':Filt['min']*q.um, 'max':Filt['max']*q.um, 'ext':Filt['ext'], 'toVega':Filt['toVega'], 'zp':Filt['zp']*q.erg/q.s/q.cm**2/q.AA, 'zp_photon':Filt['zp_photon']/q.s/q.cm**2/q.AA }
-
+      try:
+        filter_name = os.path.splitext(os.path.basename(filepath))[0]
+        RSR_x, RSR_y = [np.array(map(float,i)) for i in zip(*txt2dict(filepath,to_list=True,skip=['#']))]
+        RSR_x, RSR_y = (RSR_x*(q.um if min(RSR_x)<100 else q.AA)).to(q.um), RSR_y*q.um/q.um
+        Filt = a.filter_info(filter_name)
+        filters[filter_name] = {'wav':RSR_x, 'rsr':RSR_y, 'system':Filt['system'], 'eff':Filt['eff']*q.um, 'min':Filt['min']*q.um, 'max':Filt['max']*q.um, 'ext':Filt['ext'], 'toVega':Filt['toVega'], 'zp':Filt['zp']*q.erg/q.s/q.cm**2/q.AA, 'zp_photon':Filt['zp_photon']/q.s/q.cm**2/q.AA }
+      except: pass
     for i in filters.keys():
       if filters[i]['system'] not in systems: filters.pop(i)    
     return filters
@@ -147,7 +164,7 @@ def goodness(spec1, spec2, array=False, exclude=[], filt_dict=None, weighting=Tr
   if isinstance(spec1,dict) and isinstance(spec2,dict) and filt_dict:
     bands, w1, f1, e1, f2, e2, weight, bnds = [i for i in filt_dict.keys() if all([i in spec1.keys(),i in spec2.keys()]) and i not in exclude], [], [], [], [], [], [], []
     for eff,b in sorted([(filt_dict[i]['eff'],i) for i in bands]):
-      if all([spec1[b],spec1[b+'_unc'],spec2[b],spec2[b+'_unc']]): bnds.append(b), w1.append(eff), f1.append(spec1[b]), e1.append(spec1[b+'_unc']), f2.append(spec2[b]), e2.append(spec2[b+'_unc'] if b+'_unc' in spec2.keys() else 0*spec2[b].unit), weight.append((filt_dict[b]['max']-filt_dict[b]['min']) if weighting else 1)
+      if all([spec1[b],spec1[b+'_unc'],spec2[b],spec2[b+'_unc']]): bnds.append(b), w1.append(eff.value), f1.append(spec1[b].value), e1.append(spec1[b+'_unc'].value), f2.append(spec2[b].value), e2.append(spec2[b+'_unc'].value if b+'_unc' in spec2.keys() else 0), weight.append((filt_dict[b]['max']-filt_dict[b]['min']).value if weighting else 1)
     bands, w1, f1, e1, f2, e2, weight = map(np.array, [bnds, w1, f1, e1, f2, e2, weight])
     if verbose: printer(['Band','W_spec1','F_spec1','E_spec1','F_spec2','E_spec2','Weight','g-factor'],zip(*[bnds, w1, f1, e1, f2, e2, weight, weight*(f1-f2*(sum(weight*f1*f2/(e1**2 + e2**2))/sum(weight*f2**2/(e1**2 + e2**2))))**2/(e1**2 + e2**2)]))
   else:
@@ -166,14 +183,14 @@ def group(lst, n):
     if len(val) == n: yield tuple(val)
 
 def idx_include(x, include):
-  if hasattr(x,'unit'): x = x.value
+  # if hasattr(x,'unit'): x = x.value
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
   except TypeError:
     try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in [include]])))))[0] 
     except TypeError: return range(len(x))
 
 def idx_exclude(x, exclude):
-  if hasattr(x,'unit'): x = x.value
+  # if hasattr(x,'unit'): x = x.value
   try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
   except TypeError: 
     try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
@@ -192,28 +209,32 @@ def inject_average(spectrum, position, direction, n=10):
   spectrum = zip(*rows)
   return [i*j for i,j in zip(units,spectrum)]
 
-def mag2flux(band, mag, sig_m='', photon=False):
+def mag2flux(band, mag, sig_m='', photon=False, filter_dict=''):
   '''
   For given band and magnitude returns the flux value (and uncertainty if *sig_m*) in [ergs][s-1][cm-2][A-1]
   '''
-  f = (a.filter_info(band)['zp_photon' if photon else 'zp']*(1 if photon else q.erg)/q.s/q.cm**2/q.AA*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/q.AA)
+  filt = filter_dict[band]
+  f = (filt['zp_photon' if photon else 'zp']*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/q.AA)
   sig_f = f*sig_m*np.log(10)/2.5 if sig_m else ''
-  return (f, sig_f)
+  return [f, sig_f]
   
-def flux2mag(band, flux, sig_f='', photon=True): 
+def flux2mag(band, f, sig_f='', photon=False, filter_dict=''): 
   '''
   For given band and flux returns the magnitude value (and uncertainty if *sig_f*)
   '''
-  F = -2.5*np.log10(flux/a.filter_info(band)['zp_photon' if photon else 'zp'])
-  sig_F = (2.5/np.log(10))*(sig_f/F).value if sig_f else ''  
-  return (F,sig_F)
+  filt = filter_dict[band]
+  if photon: f, sig_f = (f*(filt['eff']/(ac.h*ac.c)).to(1/q.erg)).to(1/q.s/q.cm**2/q.AA), (sig_f*(filt['eff']/(ac.h*ac.c)).to(1/q.erg)).to(1/q.s/q.cm**2/q.AA)
+  m = -2.5*np.log10((f/filt['zp_photon' if photon else 'zp']).value)
+  sig_m = (2.5/np.log(10))*(sig_f/f).value if sig_f else ''  
+  return [m,sig_m]
 
-def manual_legend(new_labels, colors, markers='', edges='', sizes='', errors='', ncol=1, append=False, styles='', fontsize=18, overplot=''):
+def manual_legend(new_labels, colors, markers='', edges='', sizes='', errors='', ncol=1, append=False, styles='', fontsize=18, overplot='', outside=False, bbox_to_anchor=(1.05,1), loc=0):
   ax = overplot or plt.gca()
   old_handles, old_labels = ax.get_legend_handles_labels()
   new_handles = [plt.errorbar((1,0), (0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m if t=='p' else '', color=c, ls=m if t=='l' else 'none', lw=2, markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r,t in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors], styles or ['p' for i in colors])]
   [i[0].remove() for i in new_handles]
-  ax.legend((old_handles if append else [])+new_handles, (old_labels if append else [])+new_labels, loc=0, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
+  if outside: ax.legend((old_handles if append else [])+new_handles, (old_labels if append else [])+new_labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol, bbox_to_anchor=bbox_to_anchor, mode="expand", borderaxespad=0.)
+  else: ax.legend((old_handles if append else [])+new_handles, (old_labels if append else [])+new_labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
 
 def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
@@ -319,11 +340,11 @@ def modelReplace(spectrum, model, replace=[], tails=False, plot=False):
   if plot: plt.figure(), plt.loglog(*model[:2], color='r', alpha=0.8), plt.loglog(*spectrum[:2], color='b', alpha=0.8), plt.loglog(*newSpec[:2], color='k', ls='--'), plt.legend(loc=0)
   return [i*j for i,j in zip(newSpec,[k.unit if hasattr(k,'unit') else 1 for k in spectrum])]
 
-def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=24):
+def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=24, sharey=True, sharex=True):
   '''
   Creates subplots with given number or *rows* and *columns*.
   '''
-  fig, axes = plt.subplots(rows, columns, sharey=True if columns>1 else False, sharex=True if rows>1 else False, figsize=figsize)
+  fig, axes = plt.subplots(rows, columns, sharey=sharey, sharex=sharex, figsize=figsize)
   plt.rc('text', usetex=True, fontsize=fontsize)
   if ylabel:
     if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical', fontsize=fontsize+8)
@@ -456,14 +477,16 @@ def pi2pc(parallax, parallax_unc=0, pc2pi=False):
       return (d, sig_d)
   else: return ['','']
 
-def polynomial(n, m, sig='', x='x', y='y', title='', degree=1, c='k', ls='--', lw=2, legend=True, ax='', output_data=False):
+def polynomial(n, m, sig='', x='x', y='y', title='', degree=1, c='k', ls='--', lw=2, legend=True, ax='', output_data=False, plot_rms='0.9'):
   p, residuals, rank, singular_values, rcond = np.polyfit(np.array(map(float,n)), np.array(map(float,m)), degree, w=1/np.array([i if i else 1 for i in sig]) if sig!='' else None, full=True)
   f = np.poly1d(p)
   w = np.linspace(min(n), max(n), 50)
   ax.plot(w, f(w), c=c, ls=ls, lw=lw, label='${}$'.format(poly_print(p, x=x, y=y)) if legend else '', zorder=10)
-  data = [[y,x,'{:.3f}'.format(float(np.sqrt(residuals/len(n))))]+['{:.3e}'.format(v) for v in list(reversed(p))]]
+  rms = np.sqrt(sum((m-f(n))**2)/len(n))
+  if plot_rms: ax.fill_between(w, f(w)-rms, f(w)+rms, color=plot_rms, zorder=-1)
+  data = [[y, r'{:.1f}\textless {}\textless {:.1f}'.format(min(n),x,max(n)), '{:.3f}'.format(rms)]+['{:.3e}'.format(v) for v in list(reversed(p))]]
   printer(['P(x)','x','rms']+[r'$c_{}$'.format(str(i)) for i in range(len(p))], data, title=title, to_txt='/Users/Joe/Desktop/{} v {}.txt'.format(x,y) if output_data else False)
-  return data
+  return data 
 
 def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3e}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
 
@@ -504,12 +527,24 @@ def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], 
           else: print str(k)[:truncate].ljust(j),
   if not to_txt: print '\n'
 
+# def rebin_spec(spec, wavnew, waveunits='um'):
+#   from pysynphot import spectrum
+#   # Gives same error answer: Err = np.array([np.sqrt(sum(spec[2].value[idx_include(wavnew,[((wavnew[0] if n==0 else wavnew[n-1]+wavnew[n])/2,wavnew[-1] if n==len(wavnew) else (wavnew[n]+wavnew[n+1])/2)])]**2)) for n in range(len(wavnew)-1)])*spec[2].unit if spec[2] is not '' else ''
+#   if len(spec)==2: spec += ['']
+#   spec, wavnew = [i*q.Unit('') for i in spec], wavnew*q.Unit('')
+#   Flx, Err, filt = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value), spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value) if type(spec[2].value)!=int else spec[2], spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
+#   return [wavnew, observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit, observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux*spec[2].unit if type(spec[2].value)!=int else np.ones(len(wavnew))*q.Unit('')]
+
 def rebin_spec(spec, wavnew, waveunits='um'):
+  from pysynphot import spectrum
   # Gives same error answer: Err = np.array([np.sqrt(sum(spec[2].value[idx_include(wavnew,[((wavnew[0] if n==0 else wavnew[n-1]+wavnew[n])/2,wavnew[-1] if n==len(wavnew) else (wavnew[n]+wavnew[n+1])/2)])]**2)) for n in range(len(wavnew)-1)])*spec[2].unit if spec[2] is not '' else ''
-  if len(spec)==2: spec += ['']
-  spec, wavnew = [i*q.Unit('') for i in spec], wavnew*q.Unit('')
-  Flx, Err, filt = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value), spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value) if type(spec[2].value)!=int else spec[2], spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
-  return [wavnew, observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit, observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux*spec[2].unit if type(spec[2].value)!=int else np.ones(len(wavnew))*q.Unit('')]
+  Flx = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value)
+  if len(spec)==2: Err = ['']
+  else: Err = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value)
+  filt = spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
+  f = observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit
+  e = (observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux if Err!=[''] else np.ones(len(wavnew)))*spec[1].unit
+  return [wavnew, f, e]
 
 def rgb_image(images, save=''):
   '''
@@ -642,14 +677,26 @@ def tails(spectrum, model, plot=False):
   if plot: plt.loglog(*spectrum[:2]), plt.loglog(model[0],model[1]), plt.loglog(*final[:2], color='k', ls='--')
   return final
 
+# def trim_spectrum(spectrum, regions, smooth_edges=10):
+#   units, spectrum = [i.unit if hasattr(i,'unit') else 1 for i in spectrum], [i.value if hasattr(i,'unit') else i for i in spectrum]
+#   trimmed_spec = [i[idx_exclude(spectrum[0], regions)] for i in spectrum]
+#   if smooth_edges: 
+#     for r in regions: 
+#       if any(spectrum[0][spectrum[0]>r[1]]): trimmed_spec = inject_average(trimmed_spec, r[1], 'right', n=smooth_edges)
+#       if any(spectrum[0][spectrum[0]<r[0]]): trimmed_spec = inject_average(trimmed_spec, r[0], 'left', n=smooth_edges)
+#   return [np.array(i)*j for i,j in zip(units,trimmed_spec)]
+
 def trim_spectrum(spectrum, regions, smooth_edges=10):
-  units, spectrum = [i.unit if hasattr(i,'unit') else 1 for i in spectrum], [i.value if hasattr(i,'unit') else i for i in spectrum]
   trimmed_spec = [i[idx_exclude(spectrum[0], regions)] for i in spectrum]
   if smooth_edges: 
-    for r in regions: 
-      if any(spectrum[0][spectrum[0]>r[1]]): trimmed_spec = inject_average(trimmed_spec, r[1], 'right', n=smooth_edges)
-      if any(spectrum[0][spectrum[0]<r[0]]): trimmed_spec = inject_average(trimmed_spec, r[0], 'left', n=smooth_edges)
-  return [np.array(i)*j for i,j in zip(units,trimmed_spec)]
+    for r in regions:
+      try:
+        if any(spectrum[0][spectrum[0]>r[1]]): trimmed_spec = inject_average(trimmed_spec, r[1], 'right', n=smooth_edges)
+      except: pass
+      try: 
+        if any(spectrum[0][spectrum[0]<r[0]]): trimmed_spec = inject_average(trimmed_spec, r[0], 'left', n=smooth_edges)
+      except: pass 
+  return trimmed_spec
 
 def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False, obj_col=0, key_row=0, start=1):
   '''
