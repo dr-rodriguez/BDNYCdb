@@ -223,6 +223,7 @@ def flux2mag(band, f, sig_f='', photon=False, filter_dict=''):
   For given band and flux returns the magnitude value (and uncertainty if *sig_f*)
   '''
   filt = filter_dict[band]
+  if f.unit=='Jy': f, sig_f = (ac.c*f/filt['eff']**2).to(q.erg/q.s/q.cm**2/q.AA), (ac.c*sig_f/filt['eff']**2).to(q.erg/q.s/q.cm**2/q.AA)
   if photon: f, sig_f = (f*(filt['eff']/(ac.h*ac.c)).to(1/q.erg)).to(1/q.s/q.cm**2/q.AA), (sig_f*(filt['eff']/(ac.h*ac.c)).to(1/q.erg)).to(1/q.s/q.cm**2/q.AA)
   m = -2.5*np.log10((f/filt['zp_photon' if photon else 'zp']).value)
   sig_m = (2.5/np.log(10))*(sig_f/f).value if sig_f else ''  
@@ -381,7 +382,7 @@ def norm_to_mag(spectrum, magnitude, band):
   '''
   Returns the flux of a given *spectrum* [W,F] normalized to the given *magnitude* in the specified photometric *band*
   '''
-  return spectrum[1]*magnitude/s.get_mag(band, [spectrum[0]*q.um,spectrum[1]*q.erg/q.s/q.cm**2/q.AA], to_flux=True, Flam=False)[0]
+  return [spectrum[0],spectrum[1]*magnitude/s.get_mag(band, spectrum, to_flux=True, Flam=False)[0],spectrum[2]]
 
 def group_spectra(spectra):
   '''
@@ -415,6 +416,19 @@ def make_composite(spectra):
       spec1, spec2 = [i[np.where(spec1[0]<spectrum[0][IDX][0])[0]] for i in spec1], [i[np.where(spec2[0]>spectrum[0][IDX][-1])[0]] for i in spec2]
       spectrum = [np.concatenate([i[:-1],j[1:-1],k[1:]]) for i,j,k in zip(spec1,mean_spec,spec2)]
   return spectrum
+  
+  # spectrum = spectra.pop(0)
+  # if spectra:
+  #   spectra = [norm_spec(spec, spectrum) for spec in spectra]
+  #   for n,spec in enumerate(spectra):
+  #     IDX, idx = np.where(np.logical_and(spectrum[0]<spec[0][-1],spectrum[0]>spec[0][0]))[0], np.where(np.logical_and(spec[0]>spectrum[0][0],spec[0]<spectrum[0][-1]))[0]
+  #     print spectrum[0]
+  #     low_res, high_res = [i[IDX] for i in spectrum], rebin_spec([i[idx] for i in spec], spectrum[0][IDX])
+  #     mean_spec = [spectrum[0][IDX], np.array([np.average([hf,lf], weights=[1/he,1/le]) for hf,he,lf,le in zip(high_res[1],high_res[2],low_res[1],low_res[2])]), np.sqrt(low_res[2]**2 + high_res[2]**2)]
+  #     spec1, spec2 = min(spectrum, spec, key=lambda x: x[0][0]), max(spectrum, spec, key=lambda x: x[0][-1])
+  #     spec1, spec2 = [i[np.where(spec1[0]<spectrum[0][IDX][0])[0]] for i in spec1], [i[np.where(spec2[0]>spectrum[0][IDX][-1])[0]] for i in spec2]
+  #     spectrum = [np.concatenate([i[:-1],j[1:-1],k[1:]]) for i,j,k in zip(spec1,mean_spec,spec2)]
+  # return spectrum
 
 def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[], trim=[], replace=[], D_Flam=None):
   '''
@@ -527,24 +541,24 @@ def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], 
           else: print str(k)[:truncate].ljust(j),
   if not to_txt: print '\n'
 
-# def rebin_spec(spec, wavnew, waveunits='um'):
-#   from pysynphot import spectrum
-#   # Gives same error answer: Err = np.array([np.sqrt(sum(spec[2].value[idx_include(wavnew,[((wavnew[0] if n==0 else wavnew[n-1]+wavnew[n])/2,wavnew[-1] if n==len(wavnew) else (wavnew[n]+wavnew[n+1])/2)])]**2)) for n in range(len(wavnew)-1)])*spec[2].unit if spec[2] is not '' else ''
-#   if len(spec)==2: spec += ['']
-#   spec, wavnew = [i*q.Unit('') for i in spec], wavnew*q.Unit('')
-#   Flx, Err, filt = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value), spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value) if type(spec[2].value)!=int else spec[2], spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
-#   return [wavnew, observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit, observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux*spec[2].unit if type(spec[2].value)!=int else np.ones(len(wavnew))*q.Unit('')]
-
 def rebin_spec(spec, wavnew, waveunits='um'):
   from pysynphot import spectrum
   # Gives same error answer: Err = np.array([np.sqrt(sum(spec[2].value[idx_include(wavnew,[((wavnew[0] if n==0 else wavnew[n-1]+wavnew[n])/2,wavnew[-1] if n==len(wavnew) else (wavnew[n]+wavnew[n+1])/2)])]**2)) for n in range(len(wavnew)-1)])*spec[2].unit if spec[2] is not '' else ''
-  Flx = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value)
-  if len(spec)==2: Err = ['']
-  else: Err = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value)
-  filt = spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
-  f = observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit
-  e = (observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux if Err!=[''] else np.ones(len(wavnew)))*spec[1].unit
-  return [wavnew, f, e]
+  if len(spec)==2: spec += ['']
+  spec, wavnew = [i*q.Unit('') for i in spec], wavnew*q.Unit('')
+  Flx, Err, filt = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value), spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value) if type(spec[2].value)!=int else spec[2], spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
+  return [wavnew, observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit, observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux*spec[2].unit if type(spec[2].value)!=int else np.ones(len(wavnew))*q.Unit('')]
+
+# def rebin_spec(spec, wavnew, waveunits='um'):
+#   from pysynphot import spectrum
+#   # Gives same error answer: Err = np.array([np.sqrt(sum(spec[2].value[idx_include(wavnew,[((wavnew[0] if n==0 else wavnew[n-1]+wavnew[n])/2,wavnew[-1] if n==len(wavnew) else (wavnew[n]+wavnew[n+1])/2)])]**2)) for n in range(len(wavnew)-1)])*spec[2].unit if spec[2] is not '' else ''
+#   Flx = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value)
+#   if len(spec)==2: Err = ['']
+#   else: Err = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value)
+#   filt = spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
+#   f = observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit
+#   e = (observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux if Err!=[''] else np.ones(len(wavnew)))*spec[1].unit
+#   return [wavnew, f, e]
 
 def rgb_image(images, save=''):
   '''
