@@ -47,7 +47,7 @@ class get_db:
         if record: compare_records(self, table, columns, record, item)
     self.clean_up(table)
    
-  def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], skip=[], start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment=''): 
+  def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], skip=[], start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', regime='', mode_id='', airmass=0, comment=''): 
     '''
     Adds an ascii spectrum to the *spectra* table given an **asciiPath**. Any *spectra* table columns besides *wavelength*, *flux*, *unc*, *snr* arrays can be specified as arguments.
     '''
@@ -57,8 +57,6 @@ class get_db:
       snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[-1][1:], dtype='float32') if snrPath else ''
       unc = flx/snr if snrPath else np.array(data[2], dtype='float32')
     except: snr = unc = ''
-    wave_const = 10000 if wavelength[0]<100 else 1
-    regime = 'OPT' if wavelength[0]<0.8*wave_const and wavelength[-1]<1.2*wave_const else 'NIR' if wavelength[0]<1.2*wave_const and wavelength[-1]>2*wave_const else 'MIR' if wavelength[-1]>3*wave_const else None
     try:
       h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').replace('COMMENT','COMMENT / ').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
       for n,i in enumerate(h): 

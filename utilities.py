@@ -139,7 +139,7 @@ def flux_calibrate(mag, dist, sig_m='', sig_d='', scale_to=10*q.pc):
   elif hasattr(mag,'unit'): return [mag*(dist/scale_to).value**2, np.sqrt((sig_m*(dist/scale_to).value)**2 + (2*mag*(sig_d*dist/scale_to**2).value)**2) if sig_m!='' and sig_d else '']
   else: print 'Could not flux calibrate that input to distance {}.'.format(dist)
 
-def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA']], systems=['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA']):
+def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA','DES']], systems=['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA','DES']):
   '''
   Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1]. 
   '''
@@ -209,6 +209,8 @@ def inject_average(spectrum, position, direction, n=10):
   spectrum = zip(*rows)
   return [i*j for i,j in zip(units,spectrum)]
 
+def Jy2mag(band, jy, jy_unc, filter_dict=''): return flux2mag(band, (ac.c*jy/filter_dict[band]['eff']**2).to(q.erg/q.s/q.cm**2/q.AA), sig_f=(ac.c*jy_unc/filter_dict[band]['eff']**2).to(q.erg/q.s/q.cm**2/q.AA), photon=False, filter_dict=filter_dict)
+
 def mag2flux(band, mag, sig_m='', photon=False, filter_dict=''):
   '''
   For given band and magnitude returns the flux value (and uncertainty if *sig_m*) in [ergs][s-1][cm-2][A-1]
@@ -229,13 +231,38 @@ def flux2mag(band, f, sig_f='', photon=False, filter_dict=''):
   sig_m = (2.5/np.log(10))*(sig_f/f).value if sig_f else ''  
   return [m,sig_m]
 
-def manual_legend(new_labels, colors, markers='', edges='', sizes='', errors='', ncol=1, append=False, styles='', fontsize=18, overplot='', outside=False, bbox_to_anchor=(1.05,1), loc=0):
+def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', styles='', fontsize=14, overplot='', bbox_to_anchor='', loc=0, ncol=1):
+  '''
+  Add manually created legends to plots and subplots
+  *labels*
+    A list of strings to appear as legend text, e.g. ['Foo','Bar','Baz']
+  *colors*
+    A list of colors for the legend markers, e.g. ['r','g','b']
+  *markers*
+    A list of markers or linestyles to use in the legend, e.g. ['o','^','--']
+  *edges*
+    A list of colors to use as marker edge colors, e.g. ['m','None','k']
+  *sizes*
+    A list of integers to specify the marker size of points or the linewidth of lines, e.g. [8,12,2]
+  *errors*
+    A list of boolean statements to indicate whether markers should display error bars of not, e.g. [True,False,False]
+  *styles*
+    A list indicating whether each legend item should display a point 'p' or a line 'l', e.g. ['p','p','l']
+  *overplot*
+    The axes to draw the legend on (defaults to the active axes)
+  *fontsize*
+    The fontsize of the legend text
+  *loc*
+    The 0-8 integer location of the legend
+  *ncol*
+    The integer number of columns to divide the legend markers into
+  '''
   ax = overplot or plt.gca()
-  old_handles, old_labels = ax.get_legend_handles_labels()
-  new_handles = [plt.errorbar((1,0), (0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m if t=='p' else '', color=c, ls=m if t=='l' else 'none', lw=2, markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r,t in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors], styles or ['p' for i in colors])]
-  [i[0].remove() for i in new_handles]
-  if outside: ax.legend((old_handles if append else [])+new_handles, (old_labels if append else [])+new_labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol, bbox_to_anchor=bbox_to_anchor, mode="expand", borderaxespad=0.)
-  else: ax.legend((old_handles if append else [])+new_handles, (old_labels if append else [])+new_labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
+  handles = [plt.errorbar((1,0), (0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m if t=='p' else '', color=c, ls=m if t=='l' else 'none', lw=5 if m==':' else 2, markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r,t in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors], styles or ['p' for i in colors])]
+  [i[0].remove() for i in handles]
+  if bbox_to_anchor: add_legend = ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol, bbox_to_anchor=bbox_to_anchor, mode="expand", borderaxespad=0.)
+  else: add_legend = ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
+  ax.add_artist(add_legend)
 
 def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
@@ -341,24 +368,24 @@ def modelReplace(spectrum, model, replace=[], tails=False, plot=False):
   if plot: plt.figure(), plt.loglog(*model[:2], color='r', alpha=0.8), plt.loglog(*spectrum[:2], color='b', alpha=0.8), plt.loglog(*newSpec[:2], color='k', ls='--'), plt.legend(loc=0)
   return [i*j for i,j in zip(newSpec,[k.unit if hasattr(k,'unit') else 1 for k in spectrum])]
 
-def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=24, sharey=True, sharex=True):
+def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=22, sharey=True, sharex=True):
   '''
   Creates subplots with given number or *rows* and *columns*.
   '''
   fig, axes = plt.subplots(rows, columns, sharey=sharey, sharex=sharex, figsize=figsize)
   plt.rc('text', usetex=True, fontsize=fontsize)
   if ylabel:
-    if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical', fontsize=fontsize+8)
+    if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical', fontsize=fontsize+4)
     else:
-      if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+8, labelpad=fontsize-8)
+      if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+4, labelpad=fontsize-4)
       else:
-        for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize+8, labelpad=fontsize-8)
+        for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize+4, labelpad=fontsize-4)
   if xlabel:
-    if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center', fontsize=fontsize+8)
+    if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center', fontsize=fontsize+4)
     else:
-      if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+8, labelpad=fontsize-8)
+      if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+4, labelpad=fontsize-4)
       else:
-        for a,l in zip(axes,xlabel): a.set_xlabel(l, fontsize=fontsize+8, labelpad=fontsize-8)
+        for a,l in zip(axes,xlabel): a.set_xlabel(l, fontsize=fontsize+4, labelpad=fontsize-4)
   plt.subplots_adjust(right=0.96, top=0.96, bottom=0.15, left=0.12, hspace=0, wspace=0), fig.canvas.draw()
   return [fig]+list(axes)
   
@@ -504,7 +531,7 @@ def polynomial(n, m, sig='', x='x', y='y', title='', degree=1, c='k', ls='--', l
 
 def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3e}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
 
-def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], skip=[], empties=False, title=False):
+def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], skip=[], empties=True, title=False):
   '''
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
   '''
@@ -545,9 +572,11 @@ def rebin_spec(spec, wavnew, waveunits='um'):
   from pysynphot import spectrum
   # Gives same error answer: Err = np.array([np.sqrt(sum(spec[2].value[idx_include(wavnew,[((wavnew[0] if n==0 else wavnew[n-1]+wavnew[n])/2,wavnew[-1] if n==len(wavnew) else (wavnew[n]+wavnew[n+1])/2)])]**2)) for n in range(len(wavnew)-1)])*spec[2].unit if spec[2] is not '' else ''
   if len(spec)==2: spec += ['']
-  spec, wavnew = [i*q.Unit('') for i in spec], wavnew*q.Unit('')
-  Flx, Err, filt = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value), spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value) if type(spec[2].value)!=int else spec[2], spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
-  return [wavnew, observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit, observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux*spec[2].unit if type(spec[2].value)!=int else np.ones(len(wavnew))*q.Unit('')]
+  try: Flx, Err, filt = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value), spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value) if spec[2] else '', spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
+  except:
+    spec, wavnew = [i*q.Unit('') for i in spec], wavnew*q.Unit('')
+    Flx, Err, filt = spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[1].value), spectrum.ArraySourceSpectrum(wave=spec[0].value, flux=spec[2].value) if spec[2] else '', spectrum.ArraySpectralElement(spec[0].value, np.ones(len(spec[0])), waveunits=waveunits)
+  return [wavnew, observation.Observation(Flx, filt, binset=wavnew.value, force='taper').binflux*spec[1].unit, observation.Observation(Err, filt, binset=wavnew.value, force='taper').binflux*spec[2].unit if spec[2] else np.ones(len(wavnew))*spec[1].unit]
 
 # def rebin_spec(spec, wavnew, waveunits='um'):
 #   from pysynphot import spectrum
@@ -602,10 +631,12 @@ def scrub(data):
   '''
   For input data [w,f,e] or [w,f] returns the list with NaN, negative, and zero flux (and corresponsing wavelengths and errors) removed. 
   '''
-  data = [i*q.Unit('') for i in data]
-  data = [i[np.where(np.logical_and(data[1].value>0,~np.isnan(data[1].value)))] for i in data]
+  units = [i.unit if hasattr(i,'unit') else 1 for i in data]
+  data = [np.asarray(i.value if hasattr(i,'unit') else i, dtype=np.float32) for i in data if isinstance(i,np.ndarray)]
+  data = [i[np.where(~np.isinf(data[1]))] for i in data]
+  data = [i[np.where(np.logical_and(data[1]>0,~np.isnan(data[1])))] for i in data]
   data = [i[np.unique(data[0], return_index=True)[1]] for i in data]
-  return [i[np.lexsort([data[0]])] for i in data]
+  return [i[np.lexsort([data[0]])]*Q for i,Q in zip(data,units)]
 
 def smooth(x,beta):
   """
@@ -700,7 +731,7 @@ def tails(spectrum, model, plot=False):
 #       if any(spectrum[0][spectrum[0]<r[0]]): trimmed_spec = inject_average(trimmed_spec, r[0], 'left', n=smooth_edges)
 #   return [np.array(i)*j for i,j in zip(units,trimmed_spec)]
 
-def trim_spectrum(spectrum, regions, smooth_edges=10):
+def trim_spectrum(spectrum, regions, smooth_edges=False):
   trimmed_spec = [i[idx_exclude(spectrum[0], regions)] for i in spectrum]
   if smooth_edges: 
     for r in regions:
@@ -749,7 +780,7 @@ def unc(spectrum, SNR=20):
   S = scrub(spectrum)
   if len(S)==3:
     try: S[2] = np.array([i/SNR if np.isnan(j) else j for i,j in zip(S[1],S[2])], dtype='float32')*(S[1].unit if hasattr(S[1],'unit') else 1)
-    except TypeError: S[2] = np.array(S[1]/SNR)
+    except: S[2] = np.array(S[1]/SNR)
   elif len(S)==2: S.append(S[1]/SNR)
   return S
 
