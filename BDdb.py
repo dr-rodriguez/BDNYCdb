@@ -47,40 +47,38 @@ class get_db:
         if record: compare_records(self, table, columns, record, item)
     self.clean_up(table)
    
-  def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], skip=[], start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', regime='', mode_id='', airmass=0, comment=''): 
+  def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], headerPath='', start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', regime='', airmass=0, comment=''): 
     '''
     Adds an ascii spectrum to the *spectra* table given an **asciiPath**. Any *spectra* table columns besides *wavelength*, *flux*, *unc*, *snr* arrays can be specified as arguments.
     '''
-    filename, data = os.path.basename(asciiPath), zip(*u.txt2dict(asciiPath, to_list=True, skip=header_chars+skip))
+    filename, data = os.path.basename(asciiPath), np.genfromtxt(asciiPath, unpack=True)
+    
+    # Pull the data columns from the ascii file and snr file if applicable
     wavelength, flux = [np.array(i, dtype='float32') for i in data][start:start+2]
     try:
-      snr = np.array(zip(*u.txt2dict(snrPath, to_list=True, start=1))[-1][1:], dtype='float32') if snrPath else ''
+      snr = np.array(np.genfromtxt(snrPath, unpack=True)[0], dtype='float32') if snrPath else ''
       unc = flx/snr if snrPath else np.array(data[2], dtype='float32')
     except: snr = unc = ''
-    try:
-      h = [[i.strip().replace('# ','').replace('\n','') for i in j.replace('=',' /').replace('COMMENT','COMMENT / ').split(' /')] for j in open(asciiPath) if any([j.startswith(char) for char in header_chars])]
-      for n,i in enumerate(h): 
-        if len(i)==1: h.pop(n)
-        elif len(i)==2: h[n].append('')
-        elif len(i)>=4: h[n] = [h[n][0],h[n][1],' '.join(h[n][2:])] 
-      hdu = pf.PrimaryHDU()
-      for i in h:
-        try: hdu.header.append(tuple(i))
-        except ValueError: pass
-      header = hdu.header
-    except: header = None
-    # except IOError: header = pf.PrimaryHDU().header
+
+    # Pull comments out of text file (lines which begin with one of the specified *header_chars*) and create FITS header for database insertion
+    h = [i.strip() for i in open(asciiPath) if any([i.startswith(char) for char in header_chars])]
+    if h:
+      header = pf.Header()
+      for i in h: header['COMMENT'] = i
+      header = pf.PrimaryHDU(header=header).header
+    else: header = None
+        
+    # Insert spectrum into database
     try:
       # Get the lowest spec_id from the spectra table
       spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
-      try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
-      except: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, None)), self.modify.commit()
+      self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
       u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
       # self.clean_up('spectra')
     except IOError: 
       print "Couldn't add spectrum to database."
-
-  def add_numpy(self, wav,flx,err,snr,filename, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', header='', wlog=False, SDSS=False):
+ 
+  def add_numpy(self, wav, flx, err, snr, filename, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', header='', wlog=False, SDSS=False):
     '''
     Generic function to insert spectra formatted as numpy arrays. Useful if the .fits file format is unusual (for instance, Magellan II Clay MIKE data) and needs to be extracted in some custom way.
     '''
@@ -436,7 +434,7 @@ class get_db:
   
 def adapt_array(arr):
   '''
-  Turns an ARRAY string stored in the database back into a Numpy array.
+  Adapts a Numpy array into an ARRAY string to put into the database.
   '''
   out = io.BytesIO()
   np.save(out, arr), out.seek(0)
@@ -444,13 +442,14 @@ def adapt_array(arr):
 
 def adapt_header(header): 
   '''
-  Turns a HEADER string stored in the database back into a FITS header.
+  Adapts a FITS header into a HEADER string to put into the database.
   '''
-  return repr([repr(r) for r in header.ascardlist() if type(r[1]) in [int,float,str]]) if hasattr(header,'cards') else None
+  return header.tostring(sep='\n')
+  # return repr(header.cards) if hasattr(header,'cards') else None
 
 def convert_array(text):
   '''
-  Converts a Numpy array into an ARRAY string to put into the database.
+  Converts an ARRAY string stored in the database back into a Numpy array.
   '''
   out = io.BytesIO(text)
   out.seek(0)
@@ -458,16 +457,9 @@ def convert_array(text):
 
 def convert_header(text):
   '''
-  Converts a FITS feader into a HEADER string to put into the database.
+  Converts a HEADER string stored in the database back into a FITS header.
   '''
-  if text:
-    hdu = pf.PrimaryHDU()
-    for i in [eval(l) for l in eval(text)]:
-      if i[0]: 
-        try: hdu.header.append(i)
-        except: pass
-    return hdu.header
-  else: return None
+  return pf.Header().fromstring(text, sep='\n') if text else None
 
 sql.register_adapter(np.ndarray, adapt_array), sql.register_adapter(pf.header.Header, adapt_header)
 sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER", convert_header)
