@@ -9,12 +9,17 @@ class get_db:
     Initialize the database at **dbpath**.  
     '''
     if os.path.isfile(dbpath):
+      def dict_factory(cursor, row):
+        d = {}
+        for idx,col in enumerate(cursor.description): d[col[0]] = row[idx]
+        return d
+    
       con = sql.connect(dbpath, isolation_level=None, detect_types=sql.PARSE_DECLTYPES)
       con.text_factory = str
       self.modify = con
       self.query = con.cursor()
       self.dict = con.cursor()
-      self.dict.row_factory = sql.Row
+      self.dict.row_factory = dict_factory
     else: print "Sorry, no such file '{}'".format(dbpath)
         
   def add_data(self, CSV, table, multiband=False):
@@ -249,12 +254,12 @@ class get_db:
     if isinstance(spectrum_id_or_path,int):
       try: 
         H = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id_or_path)).fetchone()['header']
-        if H: return H
+        if H: print H
         else: print 'No header for spectrum {}'.format(spectrum_id_or_path)
       except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
     elif os.path.isfile(spectrum_id_or_path):
       if spectrum_id_or_path.endswith('.fits'):
-        return pf.getheader(spectrum_id_or_path)
+        print pf.getheader(spectrum_id_or_path)
       else:
         txt, H = open(spectrum_id_or_path), []
         for i in txt: 
