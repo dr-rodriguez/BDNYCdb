@@ -26,21 +26,22 @@ class get_db:
     '''
     Adds data in **CSV** file to the specified database **table**. Note column names (row 1 of CSV file) must match table fields to insert, however order and completeness don't matter.
     '''   
-    data, (columns, types), insert, update = u.txt2dict(CSV, all_str=True, delim=',', to_list=False if multiband and table=='photometry' else True, start=0), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], [], []
+    data, (columns, types), insert, update = np.genfromtxt('/Users/Joe/Desktop/upload.txt', delimiter=',', dtype=None).tolist(), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], [], []
     if multiband and table=='photometry':
-      bands = u.get_filters().keys()
-      for row in data.keys():
-        for i in bands:
-          if all([k in data[row].keys() for k in [i,i+'_unc']]):
-            values = [data[row].get(col,None) for col in columns]
-            values[columns.index('magnitude')], values[columns.index('magnitude_unc')], values[columns.index('band')], values[columns.index('source_id')] = data[row].get(i), data[row].get(i+'_unc'), i, row
-            if values[1].isdigit(): update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
+      pass
+      # bands = u.get_filters().keys()
+      # for row in data.keys():
+      #   for i in bands:
+      #     if all([k in data[row].keys() for k in [i,i+'_unc']]):
+      #       values = [data[row].get(col,None) for col in columns]
+      #       values[columns.index('magnitude')], values[columns.index('magnitude_unc')], values[columns.index('band')], values[columns.index('source_id')] = data[row].get(i), data[row].get(i+'_unc'), i, row
+      #       if values[1].isdigit(): update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
     else:
-      data_columns = data.pop(0)
-      for row in data:
+      data_columns = data[0]
+      for row in data[1:]:
         values = [None for i in columns]
-        values[0] = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM {}".format(table)).fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM {}".format(table)).fetchall())[0])))[0]
         for col in columns: values[columns.index(col)] = row[data_columns.index(col)] if col in data_columns and row[data_columns.index(col)] else None
+        values[0] = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM {}".format(table)).fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM {}".format(table)).fetchall())[0])))[0]
         update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
     if insert:
       u.printer(columns, insert, truncate=30, empties=True), self.query.executemany("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), insert), self.modify.commit()
@@ -66,12 +67,20 @@ class get_db:
     except: snr = unc = ''
 
     # Pull comments out of text file (lines which begin with one of the specified *header_chars*) and create FITS header for database insertion
-    h = [i.strip() for i in open(asciiPath) if any([i.startswith(char) for char in header_chars])]
-    if h:
-      header = pf.Header()
-      for i in h: header['COMMENT'] = i
-      header = pf.PrimaryHDU(header=header).header
-    else: header = None
+    if headerPath:
+      header = pf.open(headerPath, ignore_missing_end=True)[0].header
+      new_header = pf.Header()
+        
+      # Clear '.' characters out of card names just in case and rewrite header
+      for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
+      header = pf.PrimaryHDU(header=new_header).header
+    else:
+      h = [i.strip() for i in open(asciiPath) if any([i.startswith(char) for char in header_chars])]
+      if h:
+        header = pf.Header()
+        for i in h: header['COMMENT'] = i
+        header = pf.PrimaryHDU(header=header).header
+      else: header = None
         
     # Insert spectrum into database
     try:
@@ -136,7 +145,13 @@ class get_db:
     '''
     Checks the header of the **fitsFile** and inserts the data with **source_id**.
     '''
-    filename, header = os.path.basename(fitsPath), pf.getheader(fitsPath)
+    filename = os.path.basename(fitsPath)
+    
+    # Clear '.' characters out of card names just in case and rewrite header
+    header = pf.open(fitsPath, ignore_missing_end=True)[0].header
+    new_header = pf.Header()
+    for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
+    header = pf.PrimaryHDU(header=new_header).header
 
     # x- and y-units
     if not wavelength_units:
@@ -254,12 +269,18 @@ class get_db:
     if isinstance(spectrum_id_or_path,int):
       try: 
         H = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id_or_path)).fetchone()['header']
-        if H: print H
+        if H: return H
         else: print 'No header for spectrum {}'.format(spectrum_id_or_path)
       except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
     elif os.path.isfile(spectrum_id_or_path):
       if spectrum_id_or_path.endswith('.fits'):
-        print pf.getheader(spectrum_id_or_path)
+        header = pf.open(spectrum_id_or_path, ignore_missing_end=True)[0].header
+        new_header = pf.Header()
+        
+        # Clear '.' characters out of card names just in case and rewrite header
+        for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
+        header = pf.PrimaryHDU(header=new_header).header
+        return header
       else:
         txt, H = open(spectrum_id_or_path), []
         for i in txt: 
