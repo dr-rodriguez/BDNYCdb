@@ -68,12 +68,7 @@ class get_db:
 
     # Pull comments out of text file (lines which begin with one of the specified *header_chars*) and create FITS header for database insertion
     if headerPath:
-      header = pf.open(headerPath, ignore_missing_end=True)[0].header
-      new_header = pf.Header()
-        
-      # Clear '.' characters out of card names just in case and rewrite header
-      for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
-      header = pf.PrimaryHDU(header=new_header).header
+      header = clean_header(headerPath)
     else:
       h = [i.strip() for i in open(asciiPath) if any([i.startswith(char) for char in header_chars])]
       if h:
@@ -137,6 +132,8 @@ class get_db:
       if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
     else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
 
+    if header: header = clean_header(header)
+
     spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
     self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
     u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
@@ -145,13 +142,7 @@ class get_db:
     '''
     Checks the header of the **fitsFile** and inserts the data with **source_id**.
     '''
-    filename = os.path.basename(fitsPath)
-    
-    # Clear '.' characters out of card names just in case and rewrite header
-    header = pf.open(fitsPath, ignore_missing_end=True)[0].header
-    new_header = pf.Header()
-    for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
-    header = pf.PrimaryHDU(header=new_header).header
+    filename, header = os.path.basename(fitsPath), clean_header(fitsPath)
 
     # x- and y-units
     if not wavelength_units:
@@ -274,13 +265,7 @@ class get_db:
       except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
     elif os.path.isfile(spectrum_id_or_path):
       if spectrum_id_or_path.endswith('.fits'):
-        header = pf.open(spectrum_id_or_path, ignore_missing_end=True)[0].header
-        new_header = pf.Header()
-        
-        # Clear '.' characters out of card names just in case and rewrite header
-        for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
-        header = pf.PrimaryHDU(header=new_header).header
-        return header
+        clean_header(spectrum_id_or_path)
       else:
         txt, H = open(spectrum_id_or_path), []
         for i in txt: 
@@ -493,6 +478,15 @@ sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER",
 # ==============================================================================================================================================
 # ================================= Little helper functions ====================================================================================
 # ==============================================================================================================================================
+
+def clean_header(fitsPath):
+  '''
+  Clean illegal characters from keywords, insert END card, and rewrite header
+  '''
+  header = pf.open(fitsPath, ignore_missing_end=True)[0].header
+  new_header = pf.Header()
+  for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
+  return pf.PrimaryHDU(header=new_header).header
 
 def compare_records(db, table, columns, old, new, options=['r','c','k','sql'], delete=False):
   pold, pnew = ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in old], ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in new]
