@@ -1,1 +1,0 @@
-source_id,band,magnitude,magnitude_unc,system,telescope_id,instrument_id,publication_id
