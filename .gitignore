@@ -1,6 +1,9 @@
 *.py[cod]
 *.pyc
 pysyn_cdbs/
+.env
+BDNYC.db
+.ipynb_checkpoints/
 
 # C extensions
 *.so
