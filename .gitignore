@@ -1,5 +1,6 @@
 *.py[cod]
 *.pyc
+pysyn_cdbs/
 
 # C extensions
 *.so
