@@ -265,7 +265,7 @@ class get_db:
       except TypeError: print 'No spectrum with id {}'.format(spectrum_id_or_path)
     elif os.path.isfile(spectrum_id_or_path):
       if spectrum_id_or_path.endswith('.fits'):
-        clean_header(spectrum_id_or_path)
+        return clean_header(spectrum_id_or_path)
       else:
         txt, H = open(spectrum_id_or_path), []
         for i in txt: 
@@ -456,7 +456,6 @@ def adapt_header(header):
   Adapts a FITS header into a HEADER string to put into the database.
   '''
   return header.tostring(sep='\n')
-  # return repr(header.cards) if hasattr(header,'cards') else None
 
 def convert_array(text):
   '''
