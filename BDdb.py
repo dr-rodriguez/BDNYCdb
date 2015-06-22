@@ -76,6 +76,10 @@ class get_db:
         for i in h: header['COMMENT'] = i
         header = pf.PrimaryHDU(header=header).header
       else: header = None
+
+    if not regime:
+      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
+    else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
         
     # Insert spectrum into database
     try:
@@ -87,7 +91,7 @@ class get_db:
     except IOError: 
       print "Couldn't add spectrum to database."
  
-  def add_numpy(self, wav, flx, err, snr, filename, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', header='', wlog=False, SDSS=False):
+  def add_numpy(self, wav, flx, err, snr, filename, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', headerPath='', wlog=False, SDSS=False):
     '''
     Generic function to insert spectra formatted as numpy arrays. Useful if the .fits file format is unusual (for instance, Magellan II Clay MIKE data) and needs to be extracted in some custom way.
     '''
@@ -129,10 +133,14 @@ class get_db:
       airmass = 0
 
     if not regime:
-      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
-    else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
+      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
+    else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
 
-    if header: header = clean_header(header)
+    # Pull comments out of text file (lines which begin with one of the specified *header_chars*) and create FITS header for database insertion
+    if headerPath:
+      header = clean_header(headerPath)
+    else:
+      header = None
 
     spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
     self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
@@ -195,8 +203,8 @@ class get_db:
       except (TypeError,IndexError): snr = None
 
       if not regime:
-        if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]<0.8 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
-        else: regime = 'OPT' if wav[0]<8000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
+        if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
+        else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
 
       spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
       try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
