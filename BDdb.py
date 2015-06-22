@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # BDNYC database
-import io, os, itertools, warnings, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u, astrotools as a
+import io, os, itertools, warnings, sqlite3 as sql, numpy as np, matplotlib.pyplot as plt, astropy.io.fits as pf, utilities as u
 warnings.simplefilter('ignore')
 
 class get_db:

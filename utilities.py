@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Utilities
-import warnings, glob, os, re, xlrd, cPickle, itertools, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, astrotools as a, scipy.stats as st
+import warnings, glob, os, re, xlrd, cPickle, itertools, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, scipy.stats as st
 from random import random
 from heapq import nsmallest, nlargest
 from scipy.interpolate import Rbf
