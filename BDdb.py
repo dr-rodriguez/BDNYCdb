@@ -78,8 +78,8 @@ class get_db:
       else: header = None
 
     if not regime:
-      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
-    else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
+      if wavelength[0]<500 or wavelength_units=='um': regime = 'OPT' if wavelength[0]>0.4 and wavelength[-1]<1.2 else 'MIR' if wavelength[0]>2.5 else 'NIR'     
+    else: regime = 'OPT' if wavelength[0]>4000 and wavelength[-1]<12000 else 'MIR' if wavelength[0]>25000 else 'NIR'
         
     # Insert spectrum into database
     try:
@@ -133,8 +133,8 @@ class get_db:
       airmass = 0
 
     if not regime:
-      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
-    else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
+      if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'MIR' if wav[0]>2.5 else 'NIR'    
+    else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'MIR' if wav[0]>25000 else 'NIR'
 
     # Pull comments out of text file (lines which begin with one of the specified *header_chars*) and create FITS header for database insertion
     if headerPath:
@@ -203,8 +203,8 @@ class get_db:
       except (TypeError,IndexError): snr = None
 
       if not regime:
-        if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'NIR' if wav[0]<1.2 and wav[-1]>2 else 'MIR' if wav[-1]>2.5 else None     
-        else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'NIR' if wav[0]<12000 and wav[-1]>20000 else 'MIR' if wav[-1]>25000 else None
+        if wav[0]<500 or wavelength_units=='um': regime = 'OPT' if wav[0]>0.4 and wav[-1]<1.2 else 'MIR' if wav[0]>2.5 else 'NIR'     
+        else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'MIR' if wav[0]>25000 else 'NIR'
 
       spec_id = sorted(list(set(range(1,self.query.execute("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.query.execute("SELECT id FROM spectra").fetchall())[0])))[0]
       try: self.query.execute("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()

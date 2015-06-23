@@ -233,7 +233,7 @@ def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2M
         filter_name = os.path.splitext(os.path.basename(filepath))[0]
         RSR_x, RSR_y = [np.array(map(float,i)) for i in zip(*txt2dict(filepath,to_list=True,skip=['#']))]
         RSR_x, RSR_y = (RSR_x*(q.um if min(RSR_x)<100 else q.AA)).to(q.um), RSR_y*q.um/q.um
-        Filt = a.filter_info(filter_name)
+        Filt = filter_info(filter_name)
         filters[filter_name] = {'wav':RSR_x, 'rsr':RSR_y, 'system':Filt['system'], 'eff':Filt['eff']*q.um, 'min':Filt['min']*q.um, 'max':Filt['max']*q.um, 'ext':Filt['ext'], 'toVega':Filt['toVega'], 'zp':Filt['zp']*q.erg/q.s/q.cm**2/q.AA, 'zp_photon':Filt['zp_photon']/q.s/q.cm**2/q.AA }
       except: pass
     for i in filters.keys():
