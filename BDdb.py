@@ -311,7 +311,7 @@ class get_db:
             for d in data+[columns,types]:
               if table!='sources': d.pop(1)
               if table=='spectra': d.pop(1), d.pop(2), d.pop(3), d.pop(3), d.pop(-4)
-            if data: u.printer([c.replace('wavelength_units','W').replace('flux_units','F').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('lication_id','').replace('rument_id','').replace('escope_id','').replace('mode_id','mode') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=20 if table=='sources' else 50, title='SOURCE: '+data[0][-3] if table=='sources' else table.upper(), empties=True)
+            if data: u.printer([c.replace('wavelength_units','W').replace('flux_units','F').replace('comment','com').replace('header','head').replace('wavelength_order','ord').replace('lication_id','').replace('rument_id','').replace('escope_id','').replace('mode_id','mode') for c in columns], [['Yes' if t=='HEADER' or c=='comment' and v else str(v)[2:8] if t=='ARRAY' and v is not '' else v for c,t,v in zip(columns,types,d)] for d in data] if table=='spectra' else data, truncate=20 if table=='sources' else 50, title='SOURCE: '+str(data[0][-3]) if table=='sources' else table.upper(), empties=True)
       else:
         try:
           D = self.query.execute(q+' WHERE id IN ({})'.format("'"+"','".join(map(str,IDS))+"'")).fetchall()

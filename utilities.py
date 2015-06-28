@@ -455,17 +455,17 @@ def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=22, 
   fig, axes = plt.subplots(rows, columns, sharey=sharey, sharex=sharex, figsize=figsize)
   plt.rc('text', usetex=True, fontsize=fontsize)
   if ylabel:
-    if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical', fontsize=fontsize+4)
+    if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical', fontsize=fontsize)
     else:
-      if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+4, labelpad=fontsize-4)
+      if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize, labelpad=fontsize)
       else:
-        for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize+4, labelpad=fontsize-4)
+        for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize, labelpad=fontsize)
   if xlabel:
-    if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center', fontsize=fontsize+4)
+    if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center', fontsize=fontsize)
     else:
-      if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize+4, labelpad=fontsize-4)
+      if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize, labelpad=fontsize)
       else:
-        for a,l in zip(axes,xlabel): a.set_xlabel(l, fontsize=fontsize+4, labelpad=fontsize-4)
+        for a,l in zip(axes,xlabel): a.set_xlabel(l, fontsize=fontsize, labelpad=fontsize)
   plt.subplots_adjust(right=0.96, top=0.96, bottom=0.15, left=0.12, hspace=0, wspace=0), fig.canvas.draw()
   return [fig]+list(axes)
   
