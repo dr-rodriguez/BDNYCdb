@@ -11,7 +11,7 @@ First you'll need [anaconda](https://store.continuum.io/cshop/anaconda/), which 
 
 Note that you'll need to install `anaconda`, and **not** `anaconda3`.
 
-Now download the `BDNYC.db` database file from the Dropbox link.  I recommend keeping it in the same location as this repo.  Please note that you'll need to get someone from BDNYC to give you access to that file.
+Now download the `BDNYC.db` database file [here](https://s3.amazonaws.com/bdnyc/bdnyc.db).  I recommend keeping it in the same location as this repo.
 
 ## Running the [ipython](http://ipython.org/) HOWTO
 
