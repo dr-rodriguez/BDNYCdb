@@ -5,9 +5,21 @@ warnings.simplefilter('ignore')
 
 class get_db:
   def __init__(self, dbpath):
-    '''
-    Initialize the database at **dbpath**.  
-    '''
+    """
+    Initialize the database.
+    
+    Parameters
+    ----------
+    dbpath: str 
+      The path to the database file. 
+    
+    Returns
+    -------
+    object
+      The database object
+         
+    """
+    
     if os.path.isfile(dbpath):
       def dict_factory(cursor, row):
         d = {}
@@ -23,9 +35,20 @@ class get_db:
     else: print "Sorry, no such file '{}'".format(dbpath)
         
   def add_data(self, CSV, table, multiband=False):
-    '''
+    """
     Adds data in **CSV** file to the specified database **table**. Note column names (row 1 of CSV file) must match table fields to insert, however order and completeness don't matter.
-    '''   
+    
+    Parameters
+    ----------
+      CSV: str
+        The path to the .csv file to be read in.
+      table: str
+        The name of the table into which the data should be inserted    
+      multiband: bool
+        CSV table is formatted so that the columns names are the photometric bands in stead of one band/magnitude per row
+    
+    """
+       
     data, (columns, types), insert, update = np.genfromtxt('/Users/Joe/Desktop/upload.txt', delimiter=',', dtype=None).tolist(), zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], [], []
     if multiband and table=='photometry':
       pass
@@ -53,10 +76,49 @@ class get_db:
         if record: compare_records(self, table, columns, record, item)
     self.clean_up(table)
    
-  def add_ascii(self, asciiPath, source_id, snrPath='', header_chars=['#'], headerPath='', start=0, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', regime='', airmass=0, comment=''): 
-    '''
+  def add_ascii(self, asciiPath, source_id, header_chars=['#'], start=0, snrPath='', headerPath='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', regime='', airmass=0, comment=''): 
+    """
     Adds an ascii spectrum to the *spectra* table given an **asciiPath**. Any *spectra* table columns besides *wavelength*, *flux*, *unc*, *snr* arrays can be specified as arguments.
-    '''
+    
+    Parameters
+    ----------
+    
+    asciiPath: str
+      The path to the ascii file with the wavelength, flux and (optional) uncertainty data
+    source_id: int
+      The id from the SOURCES table of the object to which the spectrum will be associated.
+    header_chars: list
+      If a line begins with any character in this list, that text will be used to generate a FITS header for the spectrum.
+    start: int
+      The index of the line after the last header line that begins the data to be saved.
+    snrPath: str (optional)
+      The path to the separate ascii file with the signal to noise values. Must be the same length as the wavelength and flux columns in the asciiPath file.
+    headerPath: str (optional)
+      The path to the FITS file that contains the header information to be stored with the spectrum.
+    wavelength_units: str (optional)
+      The wavelength units of the spectrum, e.g. 'um', 'A', 'nm'
+    flux_units: str (optional)
+      The flux units of the spectrum, e.g. 'erg/s/cm2/A', 'W m-2 um-1'
+    publication_id: int (optional)
+      The id from the PUBLICATIONS table that indicates the reference for the spectrum
+    obs_date: str (optional)
+      The date of the observation
+    wavelength_order: int (optional)
+      For high resolution spectra, the order of the observation, e.g. '65' for NIRSPEC order 65. Leave blank for low and medium resolution spectra.
+    instrument_id: int (optional)
+      The id from the INSTRUMENTS table used to take the spectrum
+    telescope_id: int (optional)
+      The id from the TELESCOPES table used to take the spectrum
+    mode_id: int (optional)
+      The id from the MODES table used to take the spectrum, if applicable
+    regime: str (optional)
+      The regime of the spectrum, e.g. 'OPT','NIR' or 'MIR'
+    airmass: float (optional)
+      The airmass at the time of observation
+    comment: str (optional)
+      Any comments about the spectrum that might be useful to future users.    
+      
+    """
     filename, data = os.path.basename(asciiPath), np.genfromtxt(asciiPath, unpack=True)
     
     # Pull the data columns from the ascii file and snr file if applicable
@@ -92,9 +154,47 @@ class get_db:
       print "Couldn't add spectrum to database."
  
   def add_numpy(self, wav, flx, err, snr, filename, source_id, wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', headerPath='', wlog=False, SDSS=False):
-    '''
+    """
     Generic function to insert spectra formatted as numpy arrays. Useful if the .fits file format is unusual (for instance, Magellan II Clay MIKE data) and needs to be extracted in some custom way.
-    '''
+    
+    Parameters
+    ----------
+    wav: array
+      The Numpy wavelength array
+    flx: array
+      The Numpy flux array
+    err: array
+      The Numpy uncertainty array
+    snr: array
+      The Numpy signal to noise array
+    filename: str
+      The filename from which the data was taken
+    source_id: int
+      The id from the SOURCES table of the object to which the spectrum will be associated.
+    wavelength_units: str (optional)
+      The wavelength units of the spectrum, e.g. 'um', 'A', 'nm'
+    flux_units: str (optional)
+      The flux units of the spectrum, e.g. 'erg/s/cm2/A', 'W m-2 um-1'
+    publication_id: int (optional)
+      The id from the PUBLICATIONS table that indicates the reference for the spectrum
+    obs_date: str (optional)
+      The date of the observation
+    wavelength_order: int (optional)
+      For high resolution spectra, the order of the observation, e.g. '65' for NIRSPEC order 65. Leave blank for low and medium resolution spectra.
+    instrument_id: int (optional)
+      The id from the INSTRUMENTS table used to take the spectrum
+    telescope_id: int (optional)
+      The id from the TELESCOPES table used to take the spectrum
+    mode_id: int (optional)
+      The id from the MODES table used to take the spectrum, if applicable
+    regime: str (optional)
+      The regime of the spectrum, e.g. 'OPT','NIR' or 'MIR'
+    airmass: float (optional)
+      The airmass at the time of observation
+    comment: str (optional)
+      Any comments about the spectrum that might be useful to future users.    
+      
+    """
     try:
       if 'microns' in wavelength_units or 'Microns' in wavelength_units or 'um' in wavelength_units: 
         wavelength_units = 'um'
@@ -147,9 +247,41 @@ class get_db:
     u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
 
   def add_fits(self, fitsPath, source_id, unc_fitsPath='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', wlog=False, SDSS=False):
-    '''
+    """
     Checks the header of the **fitsFile** and inserts the data with **source_id**.
-    '''
+    
+    Parameters
+    ----------
+    fitsPath: str
+      The path to the FITS file with the wavelength, flux and (optional) uncertainty data
+    source_id: int
+      The id from the SOURCES table of the object to which the spectrum will be associated.
+    unc_fitsPath: str
+      The path to the separate FITS file with the uncertainty values. Must be the same length as the wavelength and flux arrays in the fitsPath file.
+    wavelength_units: str (optional)
+      The wavelength units of the spectrum, e.g. 'um', 'A', 'nm'
+    flux_units: str (optional)
+      The flux units of the spectrum, e.g. 'erg/s/cm2/A', 'W m-2 um-1'
+    publication_id: int (optional)
+      The id from the PUBLICATIONS table that indicates the reference for the spectrum
+    obs_date: str (optional)
+      The date of the observation
+    wavelength_order: int (optional)
+      For high resolution spectra, the order of the observation, e.g. '65' for NIRSPEC order 65. Leave blank for low and medium resolution spectra.
+    instrument_id: int (optional)
+      The id from the INSTRUMENTS table used to take the spectrum
+    telescope_id: int (optional)
+      The id from the TELESCOPES table used to take the spectrum
+    mode_id: int (optional)
+      The id from the MODES table used to take the spectrum, if applicable
+    regime: str (optional)
+      The regime of the spectrum, e.g. 'OPT','NIR' or 'MIR'
+    airmass: float (optional)
+      The airmass at the time of observation
+    comment: str (optional)
+      Any comments about the spectrum that might be useful to future users.    
+      
+    """
     filename, header = os.path.basename(fitsPath), clean_header(fitsPath)
 
     # x- and y-units
@@ -195,9 +327,9 @@ class get_db:
         flx, wav, err = map(np.array,zip(*data)[:3])
         flx, wav, err, wavelength_units, flux_units = flx*10**-17, 10**wav, np.sqrt(1/err)*10**-17, 'A', 'ergs-1cm-2A-1'
       else:
-        data = a.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0]
+        data = u.read_spec(fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0]
         wav, flx = data[:2]
-        try: err = a.read_spec(unc_fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0][1] if unc_fitsPath else data[2]
+        try: err = u.read_spec(unc_fitsPath, errors=True, atomicron=True, negtonan=True, verbose=False, wlog=wlog)[0][1] if unc_fitsPath else data[2]
         except: err = ''
       try: snr = flx/err if any(flx) and any(err) else None
       except (TypeError,IndexError): snr = None
@@ -214,9 +346,15 @@ class get_db:
     except KeyError: print "Couldn't add fits file {}".format(fitsPath); print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, mode_id, airmass, comment]
   
   def clean_up(self, table):
-    '''
+    """
     Removes exact duplicates, blank records or data without a *source_id* from the specified **table**. Then finds possible duplicates and prompts for conflict resolution.
-    '''
+    
+    Parameters
+    ----------
+    table: str
+      The name of the table to remove duplicates, blanks, and data without source attributions.
+    
+    """
     (columns, types), dup, ignore, I = zip(*self.query.execute("PRAGMA table_info({})".format(table)).fetchall())[1:3], 1, [], ''
     
     # Delete blank records, exact duplicates, or data without a source_id
@@ -255,16 +393,32 @@ class get_db:
     else: print 'Finished clean up on {} table.'.format(table.upper())
 
   def edit_columns(self, table, columns, types):
-    '''
+    """
     Rearrange, add or delete columns from database **table** with desired ordered list of **columns** and corresponding data **types**.
-    '''
+    
+    Parameters
+    ----------
+    table: str
+      The name of the table to modify
+    columns: list
+      A list of the columns in the order in which they are to appear in the SQL table
+    types: list
+      A list of the types corresponding to each column in the columns list above.
+    
+    """
     types[0] = 'INTEGER PRIMARY KEY'
     self.query.execute("ALTER TABLE {0} RENAME TO TempOldTable".format(table)), self.query.execute("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), self.query.execute("INSERT INTO {0} ({1}) SELECT {1} FROM TempOldTable".format(table, ','.join([c for c in list(zip(*self.query.execute("PRAGMA table_info(TempOldTable)").fetchall())[1]) if c in columns]))), self.query.execute("DROP TABLE TempOldTable")
     
   def header(self, spectrum_id_or_path):
-    '''
+    """
     Prints the header information for the given **spectrum_id_or_path**.
-    '''
+    
+    Parameters
+    ----------
+    spectrum_id_or_path: (int, str)
+      The id from the SPECTRA table or the path to the FITS file of the spectrum header to print.
+    
+    """
     if isinstance(spectrum_id_or_path,int):
       try: 
         H = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id_or_path)).fetchone()['header']
@@ -283,10 +437,16 @@ class get_db:
     else: print 'No such file {}'.format(spectrum_id_or_path)
 
   def identify(self, search):
-    '''
+    """
     For **search** input of (ra,dec) decimal degree tuple, i.e. '(12.3456,-65.4321)', returns all sources within 1 arcminute.
     For **search** input of text string, i.e. 'vb10', returns all sources with case-insensitive partial text matches in *names* or *designation* columns.
-    '''
+    
+    Parameters
+    ----------
+    search: (str, tuple)
+      The text or coordinate tuple to search the SOURCES table with.
+      
+    """
     try: q = "SELECT id,ra,dec,designation,unum,shortname,names FROM sources WHERE ra BETWEEN "+str(search[0]-0.01667)+" AND "+str(search[0]+0.01667)+" AND dec BETWEEN "+str(search[1]-0.01667)+" AND "+str(search[1]+0.01667)
     except TypeError: q = "SELECT id,ra,dec,designation,unum,shortname,components,companions,names FROM sources WHERE REPLACE(names,' ','') like '%"+search.replace(' ','')+"%' or designation like '%"+search+"%' or unum like '%"+search+"%' or shortname like '%"+search+"%'"
     results = self.query.execute(q).fetchall()
@@ -296,9 +456,26 @@ class get_db:
     else: print "No objects found by {}".format(search)
       
   def inventory(self, ID, verbose=True, plot=False, data=False):
-    '''
+    """
     Prints a summary of all objects in the database. Input string or list of strings in **ID** or **unum** for specific objects.
-    '''
+    
+    Parameters
+    ----------
+    ID: (int, list)
+      The id or list of ids from the SOURCES table whose data across all tables is to be printed.
+    verbose: bool
+      Prints all data from all tables if True else prints a data summary.
+    plot: bool
+      Plots all spectra for the object.
+    data: bool
+      If ID is a list and data is True, returns the results of the SOURCES table search.
+      
+    Returns
+    -------
+    dict
+      If ID is a list and data is True, returns the results of the summary SQL query for all given source_id.
+    
+    """
     if ID:
       q = "SELECT sources.id, sources.unum, sources.designation, sources.ra, sources.dec, (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='OPT'), (SELECT COUNT(*) FROM spectra WHERE spectra.source_id=sources.id AND spectra.regime='NIR'), (SELECT COUNT(*) FROM photometry WHERE photometry.source_id=sources.id), (SELECT parallax from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT parallax_unc from parallaxes WHERE parallaxes.source_id=sources.id), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='OPT'), (SELECT spectral_type FROM spectral_types WHERE spectral_types.source_id=sources.id AND regime='IR'), (SELECT gravity from spectral_types WHERE spectral_types.source_id=sources.id) FROM sources"
       IDS = ID if isinstance(ID,list) else [ID]
@@ -325,9 +502,19 @@ class get_db:
           for i in self.dict.execute("SELECT * FROM spectra WHERE source_id={}".format(I)).fetchall(): self.plot_spectrum(i['id'])
 
   def merge(self, conflicted, tables=[], diff_only=True):
-    '''
+    """
     Merges specific **tables** or all tables of **conflicted** databse into the master database.
-    '''
+    
+    Parameters
+    ----------
+    conflicted: str
+      The path of the SQL database to be merged into the master.
+    tables: list (optional)
+      The list of tables to merge. If None, all tables are merged.
+    diff_only: bool
+      If True, only prints the differences of each table and doesn't actually merge anything.
+      
+    """
     if os.path.isfile(conflicted):
       # Load and attach master and conflicted databases
       con, master, reassign = get_db(conflicted), self.query.execute("PRAGMA database_list").fetchall()[0][2], {}
@@ -402,9 +589,17 @@ class get_db:
     else: print "File '{}' not found!".format(conflicted)
     
   def output_spectrum(self, spectrum_id, filepath):
-    '''
+    """
     Prints a file of the spectrum with id **spectrum_id** to an ascii file with specified **filepath**.
-    '''
+    
+    Parameters
+    ----------
+    spectrum_id: int
+      The id from the SPECTRA table of the spectrum to print to file.
+    filepath: str
+      The path of the file to print the data to.
+    
+    """
     data = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id)).fetchone()
     if data:
       import csv
@@ -418,24 +613,47 @@ class get_db:
       u.dict2txt({str(w):{'flux [{}]'.format(data['flux_units']):str(f), 'unc [{}]'.format(data['flux_units']):str(e)} for w,f,e in zip(data['wavelength'],data['flux'],data['unc'])}, fn, column1='# wavelength [{}]'.format(data['wavelength_units']), append=True)
     else: print "No spectrum found with id {}".format(spectrum_id)
   
-  def plot_spectrum(self, ID):
-    '''
+  def plot_spectrum(self, spectrum_id):
+    """
     Plots spectrum **ID** from SPECTRA table.
-    '''
-    i = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(ID)).fetchone()
+    
+    Parameters
+    ----------
+    spectrum_id: int
+      The id from the SPECTRA table of the spectrum to plot.
+      
+    """
+    i = self.dict.execute("SELECT * FROM spectra WHERE id={}".format(spectrum_id)).fetchone()
     if i:
       try:
         plt.figure(), plt.rc('text', usetex=False), plt.loglog(i['wavelength'], i['flux'], c='b', label='spec_id: {}'.format(i['id'])), plt.grid(True), plt.yscale('log', nonposy='clip'), plt.title('source_id = {}'.format(i['source_id'])), plt.figtext(0.15,0.88, '{}\n{}\n{}\n{}'.format(i['filename'],self.query.execute("SELECT name FROM telescopes WHERE id={}".format(i['telescope_id'])).fetchone()[0] if i['telescope_id'] else '',self.query.execute("SELECT name FROM instruments WHERE id={}".format(i['instrument_id'])).fetchone()[0] if i['instrument_id'] else '',i['obs_date']), verticalalignment='top'), plt.xlabel('[{}]'.format(i['wavelength_units'])), plt.ylabel('[{}]'.format(i['flux_units'])), plt.legend(loc=8, frameon=False)
         X, Y = plt.xlim(), plt.ylim()
         try: plt.fill_between(i['wavelength'], i['flux']-i['unc'], i['flux']+i['unc'], color='b', alpha=0.3), plt.xlim(X), plt.ylim(Y)
-        except TypeError: print 'No uncertainty array for spectrum {}'.format(ID)
-      except IOError: print "Couldn't print spectrum {}".format(ID)
+        except TypeError: print 'No uncertainty array for spectrum {}'.format(spectrum_id)
+      except IOError: print "Couldn't print spectrum {}".format(spectrum_id)
     else: print "No spectrum {} in the SPECTRA table.".format(ID)
 
   def lookup(self, table, ids=None, concatenate='', delim='/'):
-    '''
+    """
     Quickly look up records from the specified *table* and list *ids* to limit results. Specify column values to *concatenate* into a string.
-    '''
+    
+    Parameters
+    ----------
+    table: str
+      The name of the table to perform a lookup on.
+    ids: (int, list)
+      An id or list of ids to lookup.
+    concatenate: str
+      The name of the column whose values should be joined by delim and returned.
+    delim: str
+      If concatenate, the delimiter to be used to join the results.
+      
+    Returns
+    -------
+    (list, str)
+      A list of the complete record(s) or a concatenated string from the desired table with the given ids. 
+    
+    """
     if ids=='-' or ids==['-']: return '-'
     elif type(ids)==str and table.lower()=='publications' and ',' not in ids:
       return self.query.execute("SELECT * FROM publications WHERE shortname LIKE '%{0}%' OR description LIKE '%{0}%'".format(ids)).fetchall()
@@ -452,33 +670,78 @@ class get_db:
 # ==============================================================================================================================================
   
 def adapt_array(arr):
-  '''
+  """
   Adapts a Numpy array into an ARRAY string to put into the database.
-  '''
+  
+  Parameters
+  ----------
+  arr: array
+    The Numpy array to be adapted into an ARRAY type that can be inserted into a SQL file.
+    
+  Returns
+  -------
+  ARRAY
+    The adapted array object
+    
+  """
   out = io.BytesIO()
   np.save(out, arr), out.seek(0)
   return buffer(out.read())
 
 def adapt_header(header): 
-  '''
+  """
   Adapts a FITS header into a HEADER string to put into the database.
-  '''
+  
+  Parameters
+  ----------
+  header: fits.header
+    The FITS header to be adapted into a HEADER type that can be inserted into a SQL file.
+    
+  Returns
+  -------
+  HEADER
+    The adapted header object
+    
+  """
   return header.tostring(sep='\n')
 
-def convert_array(text):
-  '''
+def convert_array(array):
+  """
   Converts an ARRAY string stored in the database back into a Numpy array.
-  '''
-  out = io.BytesIO(text)
+  
+  Parameters
+  ----------
+  array: ARRAY
+    The array object to be converted back into a Numpy array.
+    
+  Returns
+  -------
+  array
+    The converted Numpy array.
+    
+  """
+  out = io.BytesIO(array)
   out.seek(0)
   return np.load(out)
 
-def convert_header(text):
-  '''
+def convert_header(header):
+  """
   Converts a HEADER string stored in the database back into a FITS header.
-  '''
-  return pf.Header().fromstring(text, sep='\n') if text else None
+  
+  Parameters
+  ----------
+  header: HEADER
+    The header object to be converted back into a FITS header.
+    
+  Returns
+  -------
+  fits.header
+    The converted FITS header.
+    
+  """
+  return pf.Header().fromstring(header, sep='\n') if header else None
 
+# Register the adapters
 sql.register_adapter(np.ndarray, adapt_array), sql.register_adapter(pf.header.Header, adapt_header)
 sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER", convert_header)
 
@@ -487,15 +750,45 @@ sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER",
 # ==============================================================================================================================================
 
 def clean_header(fitsPath):
-  '''
-  Clean illegal characters from keywords, insert END card, and rewrite header
-  '''
+  """
+  Clean illegal characters from keywords, insert END card, and rewrite header.
+  
+  Parameters
+  ----------
+  fitsPath: str
+    The path of the FITS file to be repaired.
+  
+  Returns
+  -------
+  fits.header
+    The FITS header with an END card inserted and illegal characters removed from keywords.
+    
+  """
   header = pf.open(fitsPath, ignore_missing_end=True)[0].header
   new_header = pf.Header()
   for x,y,z in header.cards: new_header[x.replace('.','_')] = (y,z)
   return pf.PrimaryHDU(header=new_header).header
 
 def compare_records(db, table, columns, old, new, options=['r','c','k','sql'], delete=False):
+  """
+  Compares similar records and prompts the user to make decisions about keeping, updating, or modifying records in question.
+  
+  Parameters
+  ----------
+  table: str
+    The name of the table whose records are being compared.
+  columns: list
+    The list of columns across which the comparison should be made.
+  old: (str, int, float, blob)
+    The value of the record with the lower id.
+  new: (str, int, float, blob)
+    The value of the record with the higher id.
+  options: list
+    The allowed options: 'r' for replace, 'c' for complete, 'k' for keep, 'sql' for raw SQL input.
+  delete: bool
+    Delete the record with the higher id.
+    
+  """
   pold, pnew = ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in old], ['{:.3g}...{:.3g}'.format(i[0],i[-1]) if isinstance(i, np.ndarray) else i for i in new]
   u.printer(columns, [pold,pnew], truncate=20, empties=True, highlight=list(itertools.chain.from_iterable([[(i,n+1) for n,(ov,nv) in enumerate(zip(pold[1:],pnew[1:])) if ov!=nv] for i in range(2)])))
   replace = raw_input("Keep both records [k]? Or replace [r], complete [c], or keep only [Press *Enter*] record {}? (Type column name to inspect or 'help' for options): ".format(old[0]))
@@ -534,20 +827,3 @@ def compare_records(db, table, columns, old, new, options=['r','c','k','sql'], d
   elif not replace:
     if delete: db.query.execute("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
     else: pass
-
-def associate(unum, filename, lookupPath=''):  
-  if len(unum) == 6 and unum.startswith('U') and unum[1:].isdigit():
-    lookup = lookupPath or path+'Spectra/unum_lookup.txt'
-    with open(lookup, "a") as unumFile:
-      unumFile.write('\n'+unum+'\t'+filename) 
-    print "File {} linked to object {}.".format(filename,unum)
-  else: print "Could not update list with unum '{}' and filename '{}'.".format(unum,filename)
-
-def has_unum(text):
-  if 'U' in text.upper():
-    idx = text.upper().index('U')
-    num = text[idx+1:idx+6]
-    return text[idx:idx+6].upper() if num.isdigit() and len(num)==5 else None
-  else: return None    
-
-def shortname(desig): return desig[desig.index('J')+1:desig.index('J')+5] + desig[desig.index('-' if '-' in desig else '+'):desig.index('-' if '-' in desig else '+')+5]
