@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Utilities
-import warnings, glob, os, re, xlrd, cPickle, itertools, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, scipy.stats as st
+import warnings, glob, os, re, xlrd, cPickle, itertools, astropy.units as q, astropy.constants as ac, numpy as np, matplotlib.pyplot as plt, astropy.coordinates as apc, scipy.stats as st, astropy.io.fits as pf
 from random import random
 from heapq import nsmallest, nlargest
 from scipy.interpolate import Rbf
@@ -129,7 +129,7 @@ def filter_info(band):
               "DES_r":   { 'eff': 0.6231,   'min': 0.541534, 'max': 0.698914, 'zp': 2.265389e-09, 'zp_photon': 7.234969e+02, 'toVega':0,   'ext': 0,   'system': 'DES' },
               "DES_i":   { 'eff': 0.7625,   'min': 0.668947, 'max': 0.838945, 'zp': 1.235064e-09, 'zp_photon': 4.820083e+02, 'toVega':0,   'ext': 0,   'system': 'DES' },
               "DES_z":   { 'eff': 0.9134,   'min': 0.796044, 'max': 1.083325, 'zp': 8.072777e-10, 'zp_photon': 3.712548e+02, 'toVega':0,   'ext': 0,   'system': 'DES' },
-              "DES_Y":   { 'eff': 1.0289,   'min': 0.304828, 'max': 0.402823, 'zp': 6.596909e-10, 'zp_photon': 3.280450e+02, 'toVega':0,   'ext': 0,   'system': 'DES' },
+              "DES_Y":   { 'eff': 1.0289,   'min': 0.930000, 'max': 1.074600, 'zp': 6.596909e-10, 'zp_photon': 3.280450e+02, 'toVega':0,   'ext': 0,   'system': 'DES' },
               
               "J":       { 'eff': 1.2350,   'min': 1.080647, 'max': 1.406797, 'zp': 3.129e-10,    'zp_photon': 1.943482e+02, 'toVega':0,      'ext': 0.0166, 'system': '2MASS' }, # ZP from Cohen et al. (2003)
               "H":       { 'eff': 1.6620,   'min': 1.478738, 'max': 1.823102, 'zp': 1.133e-10,    'zp_photon': 9.437966e+01, 'toVega':0,      'ext': 0.0146, 'system': '2MASS' }, # ZP from Cohen et al. (2003)
@@ -311,7 +311,7 @@ def flux2mag(band, f, sig_f='', photon=False, filter_dict=''):
   sig_m = (2.5/np.log(10))*(sig_f/f).value if sig_f else ''  
   return [m,sig_m]
 
-def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', styles='', fontsize=14, overplot='', bbox_to_anchor='', loc=0, ncol=1):
+def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', styles='', fontsize=14, overplot='', bbox_to_anchor='', loc=0, ncol=1, figlegend=False):
   '''
   Add manually created legends to plots and subplots
   *labels*
@@ -340,9 +340,11 @@ def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', sty
   ax = overplot or plt.gca()
   handles = [plt.errorbar((1,0), (0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m if t=='p' else '', color=c, ls=m if t=='l' else 'none', lw=5 if m==':' else 2, markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r,t in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors], styles or ['p' for i in colors])]
   [i[0].remove() for i in handles]
-  if bbox_to_anchor: add_legend = ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol, bbox_to_anchor=bbox_to_anchor, mode="expand", borderaxespad=0.)
-  else: add_legend = ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
-  ax.add_artist(add_legend)
+  if figlegend:
+    plt.figlegend(handles, labels, figlegend, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, fontsize=fontsize, handleheight=2, handlelength=1.5, ncol=ncol)
+  else:
+    add_legend = ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol, bbox_to_anchor=bbox_to_anchor, mode="expand", borderaxespad=0.) if bbox_to_anchor else ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
+    ax.add_artist(add_legend)    
 
 def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
@@ -448,7 +450,7 @@ def modelReplace(spectrum, model, replace=[], tails=False, plot=False):
   if plot: plt.figure(), plt.loglog(*model[:2], color='r', alpha=0.8), plt.loglog(*spectrum[:2], color='b', alpha=0.8), plt.loglog(*newSpec[:2], color='k', ls='--'), plt.legend(loc=0)
   return [i*j for i,j in zip(newSpec,[k.unit if hasattr(k,'unit') else 1 for k in spectrum])]
 
-def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=22, sharey=True, sharex=True):
+def multiplot(rows, columns, ylabel='', xlabel='', xlabelpad='', ylabelpad='', hspace=0, wspace=0, figsize=(15,7), fontsize=22, sharey=True, sharex=True):
   '''
   Creates subplots with given number or *rows* and *columns*.
   '''
@@ -457,16 +459,16 @@ def multiplot(rows, columns, ylabel='', xlabel='', figsize=(15,7), fontsize=22, 
   if ylabel:
     if isinstance(ylabel,str): fig.text(0.04, 0.5, ylabel, ha='center', va='center', rotation='vertical', fontsize=fontsize)
     else:
-      if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize, labelpad=fontsize)
+      if columns>1: axes[0].set_ylabel(ylabel, fontsize=fontsize, labelpad=ylabelpad or fontsize)
       else:
-        for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize, labelpad=fontsize)
+        for a,l in zip(axes,ylabel): a.set_xlabel(l, fontsize=fontsize, labelpad=xlabelpad or fontsize)
   if xlabel:
     if isinstance(xlabel,str): fig.text(0.5, 0.04, xlabel, ha='center', va='center', fontsize=fontsize)
     else:
-      if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize, labelpad=fontsize)
+      if rows>1: axes[0].set_ylabel(ylabel, fontsize=fontsize, labelpad=ylabelpad or fontsize)
       else:
-        for a,l in zip(axes,xlabel): a.set_xlabel(l, fontsize=fontsize, labelpad=fontsize)
-  plt.subplots_adjust(right=0.96, top=0.96, bottom=0.15, left=0.12, hspace=0, wspace=0), fig.canvas.draw()
+        for a,l in zip(axes,xlabel): a.set_xlabel(l, fontsize=fontsize, labelpad=xlabelpad or fontsize)
+  plt.subplots_adjust(right=0.96, top=0.96, bottom=0.15, left=0.12, hspace=hspace, wspace=wspace), fig.canvas.draw()
   return [fig]+list(axes)
   
 def norm_spec(spectrum, template, exclude=[], include=[]):
@@ -605,8 +607,9 @@ def polynomial(n, m, sig='', x='x', y='y', title='', degree=1, c='k', ls='--', l
   ax.plot(w, f(w), c=c, ls=ls, lw=lw, label='${}$'.format(poly_print(p, x=x, y=y)) if legend else '', zorder=10)
   rms = np.sqrt(sum((m-f(n))**2)/len(n))
   if plot_rms: ax.fill_between(w, f(w)-rms, f(w)+rms, color=plot_rms, zorder=-1)
-  data = [[y, r'{:.1f}\textless {}\textless {:.1f}'.format(min(n),x,max(n)), '{:.3f}'.format(rms)]+['{:.3e}'.format(v) for v in list(reversed(p))]]
-  printer(['P(x)','x','rms']+[r'$c_{}$'.format(str(i)) for i in range(len(p))], data, title=title, to_txt='/Users/Joe/Desktop/{} v {}.txt'.format(x,y) if output_data else False)
+  data = [[y, (min(n),max(n)), rms]+list(reversed(p))]
+  print_data = [[y, r'{:.1f}\textless {}\textless {:.1f}'.format(min(n),x,max(n)), '{:.3f}'.format(rms)]+['{:.3e}'.format(v) for v in list(reversed(p))]]
+  printer(['P(x)','x','rms']+[r'$c_{}$'.format(str(i)) for i in range(len(p))], print_data, title=title, to_txt='/Users/Joe/Desktop/{} v {}.txt'.format(x,y) if output_data else False)
   return data 
 
 def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3e}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
