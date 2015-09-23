@@ -36,47 +36,51 @@ class get_db:
       self.dict = self.query_dict.execute
     else: print "Sorry, no such file '{}'".format(dbpath)
         
-  def add_data(self, CSV, table, multiband=False):
+  def add_data(self, CSV, table):
     """
     Adds data in **CSV** file to the specified database **table**. Note column names (row 1 of CSV file) must match table fields to insert, however order and completeness don't matter.
     
     Parameters
     ----------
-      CSV: str
-        The path to the .csv file to be read in.
-      table: str
-        The name of the table into which the data should be inserted    
-      multiband: bool
-        CSV table is formatted so that the columns names are the photometric bands in stead of one band/magnitude per row
+    CSV: str
+      The path to the .csv file to be read in.
+    table: str
+      The name of the table into which the data should be inserted    
+
+    Returns
+    -------
+    None
     
     """
-       
-    data, (columns, types), insert, update = np.genfromtxt('/Users/Joe/Desktop/upload.txt', delimiter=',', dtype=None).tolist(), zip(*self.list("PRAGMA table_info({})".format(table)).fetchall())[1:3], [], []
-    if multiband and table=='photometry':
-      pass
-      # bands = u.get_filters().keys()
-      # for row in data.keys():
-      #   for i in bands:
-      #     if all([k in data[row].keys() for k in [i,i+'_unc']]):
-      #       values = [data[row].get(col,None) for col in columns]
-      #       values[columns.index('magnitude')], values[columns.index('magnitude_unc')], values[columns.index('band')], values[columns.index('source_id')] = data[row].get(i), data[row].get(i+'_unc'), i, row
-      #       if values[1].isdigit(): update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
-    else:
-      data_columns = data[0]
-      for row in data[1:]:
-        values = [None for i in columns]
-        for col in columns: values[columns.index(col)] = row[data_columns.index(col)] if col in data_columns and row[data_columns.index(col)] else None
-        values[0] = sorted(list(set(range(1,self.list("SELECT max(id) FROM {}".format(table)).fetchone()[0]+2))-set(zip(*self.list("SELECT id FROM {}".format(table)).fetchall())[0])))[0]
-        update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
+    # Digest the csv file into Python 
+    data, insert, update = np.genfromtxt(CSV, delimiter=',', dtype=object).tolist(), [], []
+    
+    # Get the column names and data types from the table
+    columns, types = zip(*self.list("PRAGMA table_info({})".format(table)).fetchall())[1:3]
+
+    # Grab the column names from the first line of the input CSV file 
+    data_columns = data.pop(0)
+    
+    # For each row, organize the data into the appropriate form for table insertion
+    for row in data:
+      values = [None for i in columns]
+      for col in columns: values[columns.index(col)] = row[data_columns.index(col)] if col in data_columns and row[data_columns.index(col)] else None
+      # values[0] = sorted(list(set(range(1,self.list("SELECT max(id) FROM {}".format(table)).fetchone()[0]+2))-set(zip(*self.list("SELECT id FROM {}".format(table)).fetchall())[0])))[0]
+      update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
+
+    # If they are unique records (i.e. don't have an 'id' column value specified in the CSV file), add them as new records
     if insert:
-      u.printer(columns, insert, truncate=30, empties=True), self.listmany("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), insert), self.modify.commit()
+      u.printer(columns, insert, truncate=30, empties=True)
+      for i in insert: self.list("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), i), self.modify.commit()
       print "{} new records added to the {} table.".format(len(insert),table.upper())
+
+    # If they do have a specified 'id', update the fields for that record with the supplied information
     if update:
       u.printer(['Command','Result'],[['-'*30,'-'*100],['[column name]','Display full record entry for that column without taking action'],['k','Keeps both records and assigns second one new id if necessary'],['r','Replaces all columns of first record with second record values'],['r [column name] [column name]...','Replaces specified columns of first record with second record values'],['c','Complete empty columns of first record with second record values where possible'],['[Enter]','Keep first record and delete second'],['abort','Abort merge of current table, undo all changes, and proceed to next table']], title=' ')
       for item in update:
         record = self.list("SELECT * FROM {} WHERE id={}".format(table, item[columns.index('id')])).fetchone()
         if record: compare_records(self, table, columns, record, item)
-    self.clean_up(table)
+    # self.clean_up(table)
    
   def add_ascii(self, asciiPath, source_id, header_chars=['#'], start=0, snrPath='', headerPath='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', regime='', airmass=0, comment=''): 
     """
@@ -670,7 +674,7 @@ class get_db:
 # ==============================================================================================================================================
 # ================================= Adapters and converters for special data types =============================================================
 # ==============================================================================================================================================
-  
+
 def adapt_array(arr):
   """
   Adapts a Numpy array into an ARRAY string to put into the database.
@@ -743,9 +747,21 @@ def convert_header(header):
   """
   return pf.Header().fromstring(header, sep='\n') if header else None
 
+def convert_spectrum(url):
+  if url.endswith('.fits'): 
+    return fits.open(url, cache=True)[0]
+  elif url.endswith('.txt'):
+    return np.genfromtxt(url.urlopen(url), unpack=True)
+  else:
+    return url
+
 # Register the adapters
 sql.register_adapter(np.ndarray, adapt_array), sql.register_adapter(pf.header.Header, adapt_header)
-sql.register_converter("ARRAY", convert_array), sql.register_converter("HEADER", convert_header)
+
+# Register the converters
+sql.register_converter("ARRAY", convert_array)
+sql.register_converter("HEADER", convert_header)
+sql.register_converter("URL", convert_spectrum)
 
 # ==============================================================================================================================================
 # ================================= Little helper functions ====================================================================================
