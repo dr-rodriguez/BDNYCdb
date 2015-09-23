@@ -1,0 +1,1 @@
+This package is used to interact with the BDNYC.db SQLite database file, an archive of spectra, photometry, and astrometry for ~1300 ultracool dwarfs.
