@@ -17,7 +17,7 @@ with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f: long_descr
 
 setup(
     name='BDNYCdb',
-    version='0.1.0',
+    version='0.1.0.post1',
     description='A Python library to communicate with the BDNYC Data Archive SQL file.',
     long_description=long_description,
     url='https://github.com/BDNYC/BDNYCdb',
