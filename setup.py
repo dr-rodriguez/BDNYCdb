@@ -11,15 +11,10 @@ except ImportError:
 from codecs import open
 from os import path
 
-here = path.abspath(path.dirname(__file__))
-
-with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f: long_description = f.read()
-
 setup(
     name='BDNYCdb',
-    version='0.1.0.post1',
+    version='0.1.0.post2',
     description='A Python library to communicate with the BDNYC Data Archive SQL file.',
-    long_description=long_description,
     url='https://github.com/BDNYC/BDNYCdb',
     author='Joe Filippazzo',
     author_email='bdnyc.group@gmail.com',
