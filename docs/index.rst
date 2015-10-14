@@ -11,7 +11,11 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-
+.. automodule:: BDdb
+   :members:
+   
+.. automodule:: utilities
+   :members:
 
 Indices and tables
 ==================
