@@ -4,15 +4,32 @@
 # Created: November 4, 2015
 # Read in a table from an SQL query of the BDNYC Database and convert to a VOTable file for use elsewhere
 
-from BDNYCdb import BDdb
 from astropy.table import Table, Column
 from astropy.io.votable import from_table
 
-# Function to parse the dictionary and add to the table
-def table_add(tab, dat, col):
+
+def table_add(tab, data, col):
+    """
+    Function to parse dictionary list **data** and add the data to table **tab** for column **col**
+
+    Parameters
+    ----------
+    tab: Table class
+      Table to store values
+    data: list
+      Dictionary list from the SQL query
+    col: str
+      Column name (ie, dictionary key) for the column to add
+
+    Returns
+    -------
+    None
+
+    """
+
     x = []
-    for i in range(len(dat)):
-        temp = dat[i][col]
+    for i in range(len(data)):
+        temp = data[i][col]
 
         # Fix up None elements
         if temp is None: temp = ''
@@ -22,7 +39,7 @@ def table_add(tab, dat, col):
     print 'Adding column', col
     tab.add_column(Column(x, name=col)
 
-# Convert dictionary list to VOTable
+
 def dict_tovot(tabdata, tabname):
     """
     Converts dictionary table **tabdata** to a VOTable with name **tabname**
