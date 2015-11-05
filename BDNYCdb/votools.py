@@ -74,3 +74,30 @@ def dict_tovot(tabdata, tabname='votable.xml'):
     votable.to_xml(tabname)
 
     print 'Table created:', tabname
+
+
+def photparse(tab):
+    """
+    Parse through a photometry table to group by source_id
+
+    Parameters
+    ----------
+    tab: list
+      SQL query dictionary list from running query_dict.execute()
+
+    Returns
+    -------
+    newtab: list
+      Dictionary list after parsing to group together sources
+
+    """
+
+    # Loop through the table and grab unique band names
+    bandnames = []
+    for i in range(len(tab)):
+        tmp = tab[i]['band']
+        if not tmp in bandnames: bandnames.append(tmp)
+
+    # Create new table, copying over existing columns but adding new ones with the band names
+    newtab = []
+
