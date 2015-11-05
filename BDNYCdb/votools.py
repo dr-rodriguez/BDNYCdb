@@ -37,10 +37,10 @@ def table_add(tab, data, col):
         x.append(temp)
 
     print 'Adding column', col
-    tab.add_column(Column(x, name=col)
+    tab.add_column(Column(x, name=col))
 
 
-def dict_tovot(tabdata, tabname):
+def dict_tovot(tabdata, tabname='votable.xml'):
     """
     Converts dictionary table **tabdata** to a VOTable with name **tabname**
 
@@ -56,6 +56,10 @@ def dict_tovot(tabdata, tabname):
     None
 
     """
+
+    # Check if input is a dictionary
+    if not isinstance(tabdata[0], dict):
+        raise TypeError('Table must be a dictionary. Call the SQL query with query_dict.execute()')
 
     # Create an empty table to store the data
     t = Table()
