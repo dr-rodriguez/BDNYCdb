@@ -32,7 +32,8 @@ def table_add(tab, data, col):
         temp = data[i][col]
 
         # Fix up None elements
-        if temp is None: temp = ''
+        if temp is None:
+            temp = ''
 
         x.append(temp)
 
@@ -40,7 +41,7 @@ def table_add(tab, data, col):
     tab.add_column(Column(x, name=col))
 
 
-def dict_tovot(tabdata, tabname='votable.xml'):
+def dict_tovot(tabdata, tabname='votable.xml', phot=False):
     """
     Converts dictionary table **tabdata** to a VOTable with name **tabname**
 
@@ -64,9 +65,17 @@ def dict_tovot(tabdata, tabname='votable.xml'):
     # Create an empty table to store the data
     t = Table()
 
-    # Run through all the columns and create them
     colnames = tabdata[0].keys()
-    for elem in colnames: table_add(t, tabdata, elem)
+    # If this is a photometry table, make sure to have the full list of columns
+    if phot:
+        for i in range(len(tabdata)):
+            tmpcol = tabdata[i].keys()
+            for elem in tmpcol: if elem not in colnames: colnames.append(elem)
+
+
+    # Run through all the columns and create them
+    for elem in colnames:
+        table_add(t, tabdata, elem)
 
     # Output to a file
     votable = from_table(t)
@@ -92,12 +101,42 @@ def photparse(tab):
 
     """
 
-    # Loop through the table and grab unique band names
+    # Loop through the table and grab unique band names and source IDs
     bandnames = []
+    uniqueid = []
     for i in range(len(tab)):
         tmp = tab[i]['band']
-        if not tmp in bandnames: bandnames.append(tmp)
+        tmpid = tab[i]['source_id']
+
+        if tmp not in bandnames:
+            bandnames.append(tmp)
+
+        if tmpid not in uniqueid:
+            uniqueid.append(tmpid)
 
     # Create new table, copying over existing columns but adding new ones with the band names
     newtab = []
+    colnames = tab[0].keys()
+    id0 = tab[0]['source_id']
+    for i in range(len(tab)):
+        tmpdict = dict()
+
+        # If not working on the same source, save the line and clear out the dictionary
+        if tab[i]['source_id'] != id0:
+            print tab[i]['source_id']
+            id0 = tab[i]['source_id']
+            newtab.append(tmpdict)
+            tmpdict.clear()
+
+        for elem in colnames:
+            if elem not in ['comments','epoch','instrument_id','magnitude','magnitude_unc','publication_id','system','telescope_id']:
+                tmpdict[elem] = tab[i][elem]
+            elif elem == 'band':
+                continue
+            else:
+                tmpstr = tab[i]['band']+'.'+elem
+                print tmpstr
+                tmpdict[tmpstr] = tab[i][elem]
+
+
 
