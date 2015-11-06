@@ -263,14 +263,12 @@ def group(lst, n):
     if len(val) == n: yield tuple(val)
 
 def idx_include(x, include):
-  # if hasattr(x,'unit'): x = x.value
   try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in include])))))[0]
   except TypeError:
     try: return np.where(np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in [include]])))))[0] 
     except TypeError: return range(len(x))
 
 def idx_exclude(x, exclude):
-  # if hasattr(x,'unit'): x = x.value
   try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
   except TypeError: 
     try: return np.where(~np.array(map(bool,map(sum, zip(*[np.logical_and(x>i[0],x<i[1]) for i in exclude])))))[0]
@@ -311,7 +309,7 @@ def flux2mag(band, f, sig_f='', photon=False, filter_dict=''):
   sig_m = (2.5/np.log(10))*(sig_f/f).value if sig_f else ''  
   return [m,sig_m]
 
-def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', styles='', fontsize=14, overplot='', bbox_to_anchor='', loc=0, ncol=1, figlegend=False):
+def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', styles='', text_colors='', fontsize=14, overplot='', bbox_to_anchor='', loc=0, ncol=1, figlegend=False):
   '''
   Add manually created legends to plots and subplots
   *labels*
@@ -344,7 +342,11 @@ def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', sty
     plt.figlegend(handles, labels, figlegend, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, fontsize=fontsize, handleheight=2, handlelength=1.5, ncol=ncol)
   else:
     add_legend = ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol, bbox_to_anchor=bbox_to_anchor, mode="expand", borderaxespad=0.) if bbox_to_anchor else ax.legend(handles, labels, loc=loc, frameon=False, numpoints=1, handletextpad=1 if 'l' in styles else 0, handleheight=2, handlelength=1.5, fontsize=fontsize, ncol=ncol)
-    ax.add_artist(add_legend)    
+    ax.add_artist(add_legend)
+    
+  if text_colors:
+    ltext = plt.gca().get_legend().get_texts()
+    for n,(t,c) in enumerate(zip(ltext,text_colors)): plt.setp(ltext[n], color=c) 
 
 def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', color='b', marker='o', markersize=8, contour=True, save=''):
   if figure: fig, ax1, ax2, ax3 = figure
@@ -473,19 +475,28 @@ def multiplot(rows, columns, ylabel='', xlabel='', xlabelpad='', ylabelpad='', h
   
 def norm_spec(spectrum, template, exclude=[], include=[]):
   '''
-  Returns *spectrum* with [W,F] or [W,F,E] normalized to *template* [W,F] or [W,F,E].
-  Wavelength range tuples provided in *exclude* argument are ignored during normalization, i.e. exclude=[(0.65,0.72),(0.92,0.97)].
-  '''              
-  S, T = scrub(spectrum), scrub(template)
-  S0, T0 = [i[idx_include(S[0],[(T[0][0],T[0][-1])])] for i in S], [i[idx_include(T[0],[(S[0][0],S[0][-1])])] for i in T]
-  if exclude: S0, T0 = [[i[idx_exclude(j[0],exclude)] for i in j] for j in [S0,T0]]
-  if include: S0, T0 = [[i[idx_include(j[0],include)] for i in j] for j in [S0,T0]]
-  try: norm = np.trapz(T0[1], x=T0[0])/np.trapz(rebin_spec(S0, T0[0])[1], x=T0[0])
-  except ValueError: norm = 1            
-  S[1] *= norm                                                                              
-  try: S[2] *= norm                                                        
+  Parameters
+  ----------
+  spectrum: sequence
+    The [w,f] or [w,f,e] astropy quantities spectrum to normalize
+  template: sequence
+    The [w,f] or [w,f,e] astropy quantities spectrum to be normalized to
+  exclude: sequence (optional)
+    A sequence of tuples defining the wavelength ranges to exclude in the normalization
+  include: sequence (optional)
+    A sequence of tuples defining the wavelength ranges to include in the normalization
+    
+  Returns
+  -------
+  spectrum: sequence
+    The normalized [w,f] or [w,f,e] astropy quantities spectrum
+  '''
+  s0, t0 = [np.ma.masked_where(~np.logical_and(a[0]>b[0][0],a[0]<b[0][-1]), a[1]) for a,b in [[spectrum,template],[template,spectrum]]]
+  norm = np.trapz(t0, x=template[0].value)/np.trapz(s0, x=spectrum[0].value)
+  spectrum[1] *= norm
+  try: spectrum[2] *= norm
   except IndexError: pass
-  return S
+  return spectrum
 
 def norm_to_mag(spectrum, magnitude, band): 
   '''
@@ -510,34 +521,20 @@ def make_composite(spectra):
   '''
   Creates a composite spectrum from a list of overlapping *spectra*
   '''
+  units = [i.unit for i in spectra[0]]
   spectrum = spectra.pop(0)
-  spectra = [[i.value if hasattr(i,'unit') else i for i in j] for j in spectra]
   if spectra:
     spectra = [norm_spec(spec, spectrum) for spec in spectra]
-    spectra = [[i.value if hasattr(i,'unit') else i for i in spec] for spec in spectra]
+    spectrum = [i.value for i in spectrum]
     for n,spec in enumerate(spectra):
+      spec = [i.value for i in spec]
       IDX, idx = np.where(np.logical_and(spectrum[0]<spec[0][-1],spectrum[0]>spec[0][0]))[0], np.where(np.logical_and(spec[0]>spectrum[0][0],spec[0]<spectrum[0][-1]))[0]
-      # if len(IDX)<len(idx): low_res, highres = [i[IDX] for i in spectrum], rebin_spec([i[idx] for i in spec], spectrum[0][IDX])
-      # else: low_res, high_res, IDX = rebin_spec([i[IDX] for i in spectrum], spec[0][idx]), [i[idx] for i in spec], idx
       low_res, high_res = [i[IDX] for i in spectrum], rebin_spec([i[idx] for i in spec], spectrum[0][IDX])
       mean_spec = [spectrum[0][IDX], np.array([np.average([hf,lf], weights=[1/he,1/le]) for hf,he,lf,le in zip(high_res[1],high_res[2],low_res[1],low_res[2])]), np.sqrt(low_res[2]**2 + high_res[2]**2)]
-      spec1, spec2 = min(spectrum, spec, key=lambda x: x[0][0]), max(spectrum, spec, key=lambda x: x[0][-1])
+      spec1, spec2 = sorted([spectrum,spec], key=lambda x: x[0][0])
       spec1, spec2 = [i[np.where(spec1[0]<spectrum[0][IDX][0])[0]] for i in spec1], [i[np.where(spec2[0]>spectrum[0][IDX][-1])[0]] for i in spec2]
       spectrum = [np.concatenate([i[:-1],j[1:-1],k[1:]]) for i,j,k in zip(spec1,mean_spec,spec2)]
-  return spectrum
-  
-  # spectrum = spectra.pop(0)
-  # if spectra:
-  #   spectra = [norm_spec(spec, spectrum) for spec in spectra]
-  #   for n,spec in enumerate(spectra):
-  #     IDX, idx = np.where(np.logical_and(spectrum[0]<spec[0][-1],spectrum[0]>spec[0][0]))[0], np.where(np.logical_and(spec[0]>spectrum[0][0],spec[0]<spectrum[0][-1]))[0]
-  #     print spectrum[0]
-  #     low_res, high_res = [i[IDX] for i in spectrum], rebin_spec([i[idx] for i in spec], spectrum[0][IDX])
-  #     mean_spec = [spectrum[0][IDX], np.array([np.average([hf,lf], weights=[1/he,1/le]) for hf,he,lf,le in zip(high_res[1],high_res[2],low_res[1],low_res[2])]), np.sqrt(low_res[2]**2 + high_res[2]**2)]
-  #     spec1, spec2 = min(spectrum, spec, key=lambda x: x[0][0]), max(spectrum, spec, key=lambda x: x[0][-1])
-  #     spec1, spec2 = [i[np.where(spec1[0]<spectrum[0][IDX][0])[0]] for i in spec1], [i[np.where(spec2[0]>spectrum[0][IDX][-1])[0]] for i in spec2]
-  #     spectrum = [np.concatenate([i[:-1],j[1:-1],k[1:]]) for i,j,k in zip(spec1,mean_spec,spec2)]
-  # return spectrum
+  return [i*Q for i,Q in zip([i.value if hasattr(i,'unit') else i for i in spectrum],units)]
 
 def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[], trim=[], replace=[], D_Flam=None):
   '''

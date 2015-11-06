@@ -28,50 +28,111 @@ class get_db:
     
       con = sql.connect(dbpath, isolation_level=None, detect_types=sql.PARSE_DECLTYPES)
       con.text_factory = str
-      self.modify = con
-      self.query_list = con.cursor()
-      self.query_dict = con.cursor()
-      self.query_dict.row_factory = dict_factory
-      self.list = self.query_list.execute
-      self.dict = self.query_dict.execute
+      self.conn = con
+      self.list = con.cursor().execute
+      self.dict = con.cursor()
+      self.dict.row_factory = dict_factory
+      self.dict = self.dict.execute
+    
     else: print "Sorry, no such file '{}'".format(dbpath)
-        
-  def add_data(self, CSV, table):
+
+  def modify(self, SQL, params=''):
     """
-    Adds data in **CSV** file to the specified database **table**. Note column names (row 1 of CSV file) must match table fields to insert, however order and completeness don't matter.
+    Wrapper for CRUD operations to make them distinct from queries and automatically pass commit() method to cursor.
     
     Parameters
     ----------
-    CSV: str
-      The path to the .csv file to be read in.
+    SQL: str
+      The SQL query to execute
+    params: sequence
+      Mimicks the native parameter substitution of sqlite3
+    """
+    try:
+      if SQL.lower().startswith('select'):
+        print 'Use self.query method for queries.'
+      else:
+        self.list(SQL, params)
+        self.conn.commit()
+        print 'Number of records modified: {}'.format(self.list("SELECT changes()").fetchone()[0])
+    except IOError:
+      print 'Could not execute! Please check the query syntax and parameters format.'
+
+  def query(self, SQL, params='', DICT=False, fetch='all'):
+    """
+    Wrapper for cursors so data can be retrieved as a list or dictionary from same method
+    
+    Parameters
+    ----------
+    SQL: str
+      The SQL query to execute
+    params: sequence
+      Mimicks the native parameter substitution of sqlite3
+    DICT: bool
+      Returns the data as a dictionary if True, else a list
+    """
+    try:
+      if SQL.lower().startswith('select') or SQL.lower().startswith('pragma'):
+        if DICT: return self.dict(SQL, params).fetchall() if fetch=='all' else self.dict(SQL, params).fetchone() 
+        else: return self.list(SQL, params).fetchall() if fetch=='all' else self.list(SQL, params).fetchone() 
+      else:
+        print 'Queries must begin with a SELECT statement. For database modifications use self.modify method.'  
+    except:
+      print 'Could not execute! Please check the query syntax and parameters format.'
+          
+  def add_data(self, ascii, table, delimiter='|', multiband=False):
+    """
+    Adds data in **ascii** file to the specified database **table**. Note column names (row 1 of ascii file) must match table fields to insert, however order and completeness don't matter.
+    
+    Parameters
+    ----------
+    ascii: str
+      The path to the ascii file to be read in.
     table: str
-      The name of the table into which the data should be inserted    
+      The name of the table into which the data should be inserted
+    delimiter: str
+      The string to use as the delimiter when parsing the ascii file
 
     Returns
     -------
     None
     
     """
-    # Digest the csv file into Python 
-    data, insert, update = np.genfromtxt(CSV, delimiter=',', dtype=object).tolist(), [], []
+    # Digest the ascii file into Python 
+    data, insert, update = np.genfromtxt(ascii, delimiter=delimiter, dtype=object).tolist(), [], []
     
     # Get the column names and data types from the table
     columns, types = zip(*self.list("PRAGMA table_info({})".format(table)).fetchall())[1:3]
 
-    # Grab the column names from the first line of the input CSV file 
+    # Grab the column names from the first line of the input ascii file 
     data_columns = data.pop(0)
     
-    # For each row, organize the data into the appropriate form for table insertion
+    # If a row contains photometry for multiple bands, use the *multiband argument and execute this
+    if multiband and table=='photometry':    
+      Tdata, bands, new_data = zip(*data), u.get_filters().keys(), []
+      
+      # Get the columns that are not magnitudes
+      repeat_data = [Tdata[idx] for idx,c in enumerate(data_columns) if c.replace('_unc','') not in bands]
+      repeat_cols = [c for c in data_columns if c.replace('_unc','') not in bands]+['band','magnitude','magnitude_unc']
+      
+      # For each band, make a new data row
+      for c in data_columns:
+        if c in bands:
+          new_data += zip(*repeat_data+[[c]*len(data),Tdata[data_columns.index(c)],Tdata[data_columns.index(c+'_unc')]])
+    
+      # Transpose the data columns into rows and identify the new data columns to insert
+      data, data_columns = new_data, repeat_cols
+          
+    # Insert data strictly matching SQL table field names to ascii input column names
     for row in data:
       values = [None for i in columns]
       for col in columns: values[columns.index(col)] = row[data_columns.index(col)] if col in data_columns and row[data_columns.index(col)] else None
       # values[0] = sorted(list(set(range(1,self.list("SELECT max(id) FROM {}".format(table)).fetchone()[0]+2))-set(zip(*self.list("SELECT id FROM {}".format(table)).fetchall())[0])))[0]
-      update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
-
-    # If they are unique records (i.e. don't have an 'id' column value specified in the CSV file), add them as new records
+      if isinstance(values[1],int) or (values[1] or 'None').isdigit(): update.append(tuple(values)) if values[columns.index('id')] else insert.append(tuple(values))
+        
+    # If they are unique records (i.e. don't have an 'id' column value specified in the ascii file), add them as new records
     if insert:
       u.printer(columns, insert, truncate=30, empties=True)
-      for i in insert: self.list("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), i), self.modify.commit()
+      for i in insert: self.modify("INSERT INTO {} VALUES({})".format(table, ','.join('?'*len(columns))), i)
       print "{} new records added to the {} table.".format(len(insert),table.upper())
 
     # If they do have a specified 'id', update the fields for that record with the supplied information
@@ -153,7 +214,7 @@ class get_db:
     try:
       # Get the lowest spec_id from the spectra table
       spec_id = sorted(list(set(range(1,self.list("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.list("SELECT id FROM spectra").fetchall())[0])))[0]
-      self.list("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
+      self.modify("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wavelength, wavelength_units, flux, flux_units, unc, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header))
       u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
       # self.clean_up('spectra')
     except IOError: 
@@ -249,7 +310,7 @@ class get_db:
       header = None
 
     spec_id = sorted(list(set(range(1,self.list("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.list("SELECT id FROM spectra").fetchall())[0])))[0]
-    self.list("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
+    self.modify("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header))
     u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
 
   def add_fits(self, fitsPath, source_id, unc_fitsPath='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', regime='', instrument_id='', telescope_id='', mode_id='', airmass=0, comment='', wlog=False, SDSS=False):
@@ -345,8 +406,8 @@ class get_db:
         else: regime = 'OPT' if wav[0]>4000 and wav[-1]<12000 else 'MIR' if wav[0]>25000 else 'NIR'
 
       spec_id = sorted(list(set(range(1,self.list("SELECT max(id) FROM spectra").fetchone()[0]+2))-set(zip(*self.list("SELECT id FROM spectra").fetchall())[0])))[0]
-      try: self.list("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header)), self.modify.commit()
-      except: self.list("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, None)), self.modify.commit()
+      try: self.modify("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, header))
+      except: self.modify("INSERT INTO spectra VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (spec_id, source_id, wav, wavelength_units, flx, flux_units, err, snr, wavelength_order, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment, None))
       u.printer(['spec_id','source_id','wavelength_unit','flux_unit','regime','publication_id','obs_date', 'instrument_id', 'telescope_id', 'mode_id', 'airmass', 'filename', 'comment'],[[spec_id,source_id, wavelength_units, flux_units, regime, publication_id, obs_date, instrument_id, telescope_id, mode_id, airmass, filename, comment]], empties=True)
       # self.clean_up('spectra')
     except KeyError: print "Couldn't add fits file {}".format(fitsPath); print [filename, source_id, wavelength_units, flux_units, obs_date, instrument_id, telescope_id, mode_id, airmass, comment]
@@ -364,8 +425,8 @@ class get_db:
     (columns, types), dup, ignore, I = zip(*self.list("PRAGMA table_info({})".format(table)).fetchall())[1:3], 1, [], ''
     
     # Delete blank records, exact duplicates, or data without a source_id
-    self.list("DELETE FROM {0} WHERE ({1})".format(table, columns[1]+' IS NULL' if len(columns)==2 else (' IS NULL AND '.join(columns[1:])+' IS NULL')))
-    self.list("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:]))), self.modify.commit()
+    self.modify("DELETE FROM {0} WHERE ({1})".format(table, columns[1]+' IS NULL' if len(columns)==2 else (' IS NULL AND '.join(columns[1:])+' IS NULL')))
+    self.modify("DELETE FROM {0} WHERE id NOT IN (SELECT min(id) FROM {0} GROUP BY {1})".format(table,', '.join(columns[1:])))
     if 'source_id' in columns: self.list("DELETE FROM {0} WHERE source_id IS NULL OR source_id IN ('null','None','')".format(table))
     
     if table in ['sources','spectra','photometry','spectral_types','radial_velocities','parallaxes','proper_motions']:
@@ -548,7 +609,7 @@ class get_db:
         
         else:
           # Add new columns from master table to conflicted table if necessary
-          if any([i not in conflicted_cols for i in columns]): con.list("DROP TABLE IF EXISTS Conflicted_{0}".format(table)), con.list("ALTER TABLE {0} RENAME TO Conflicted_{0}".format(table)), con.list("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), con.list("INSERT INTO {0} ({1}) SELECT {1} FROM Conflicted_{0}".format(table, ','.join(conflicted_cols))), con.list("DROP TABLE Conflicted_{0}".format(table)), con.modify.commit()
+          if any([i not in conflicted_cols for i in columns]): con.modify("DROP TABLE IF EXISTS Conflicted_{0}".format(table)), con.modify("ALTER TABLE {0} RENAME TO Conflicted_{0}".format(table)), con.modify("CREATE TABLE {0} ({1})".format(table, ', '.join(['{} {}'.format(c,t) for c,t in zip(columns,types)]))), con.modify("INSERT INTO {0} ({1}) SELECT {1} FROM Conflicted_{0}".format(table, ','.join(conflicted_cols))), con.modify("DROP TABLE Conflicted_{0}".format(table))
         
           # Pull unique records from conflicted table
           data = map(list, con.list("SELECT * FROM (SELECT 1 AS db, {0} FROM m.{2} UNION ALL SELECT 2 AS db, {0} FROM c.{2}) GROUP BY {1} HAVING COUNT(*)=1 AND db=2".format(','.join(columns),','.join(columns[1:]),table)).fetchall())
@@ -573,25 +634,25 @@ class get_db:
                 count += 1
             
               # Insert unique conflicted records into master and run BDdb.clean_up()
-              self.listmany("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for c in columns])), data), self.modify.commit()
+              self.modify("INSERT INTO {} VALUES({})".format(table, ','.join(['?' for c in columns])), data)
               print "{} records added to {} table at '{}':".format(len(data), table, master)
               u.printer(columns, [[repr(i) for i in d] for d in data], truncate=15 if table=='spectra' else 20)
               abort = self.clean_up(table)
           
               # Undo all changes to table if merge is aborted. Otherwise, push table changes to master.
-              if abort: self.list("DROP TABLE {0}".format(table)), self.list("ALTER TABLE Backup_{0} RENAME TO {0}".format(table)), self.modify.commit()
-              else: self.list("DROP TABLE Backup_{0}".format(table)), self.modify.commit(), modified_tables.append(table.upper())
+              if abort: self.modify("DROP TABLE {0}".format(table)), self.modify("ALTER TABLE Backup_{0} RENAME TO {0}".format(table))
+              else: self.modify("DROP TABLE Backup_{0}".format(table)), modified_tables.append(table.upper())
           
           else: print "{} tables identical.".format(table.upper())
       
       # Add data to CHANGELOG table
       if not diff_only:
         user_description = raw_input('\nPlease describe the changes made in this merge : ')
-        self.list("INSERT INTO changelog VALUES(?, ?, ?, ?, ?, ?, ?)", (None, date, user, machine_name, ', '.join(modified_tables), user_description, os.path.basename(conflicted))), self.modify.commit()
+        self.modify("INSERT INTO changelog VALUES(?, ?, ?, ?, ?, ?, ?)", (None, date, user, machine_name, ', '.join(modified_tables), user_description, os.path.basename(conflicted)))
       
       # Finish up and detach
       print "\nMerge complete!" if not diff_only else "\nDiff complete. No changes made to either database."
-      con.list("DETACH DATABASE c"), self.list("DETACH DATABASE c"), con.list("DETACH DATABASE m"), self.list("DETACH DATABASE m"), con.modify.close()
+      con.modify("DETACH DATABASE c"), self.modify("DETACH DATABASE c"), con.modify("DETACH DATABASE m"), self.modify("DETACH DATABASE m"), con.modify.close()
     else: print "File '{}' not found!".format(conflicted)
     
   def output_spectrum(self, spectrum_id, filepath):
@@ -822,26 +883,26 @@ def compare_records(db, table, columns, old, new, options=['r','c','k','sql'], d
         sure = raw_input('Are you sure you want to replace record {} with record {}? [y/n] : '.format(old[0],new[0]))
         if sure.lower()=='y':
           empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,n in zip(columns[1:],new[1:])])
-          if delete: db.list("DELETE FROM {} WHERE id={}".format(table, new[0]))
-          db.list("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
+          if delete: db.modify("DELETE FROM {} WHERE id={}".format(table, new[0]))
+          db.modify("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals))
       elif all([i in list(columns)+options for i in replace.lower().split()]):
         empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,n in zip(columns[1:],new[1:]) if e in replace])
         if empty_cols:
-          if delete: db.list("DELETE FROM {} WHERE id={}".format(table, new[0]))
-          db.list("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
+          if delete: db.modify("DELETE FROM {} WHERE id={}".format(table, new[0]))
+          db.modify("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals))
     elif replace.lower()=='c' and 'c' in options:
       try:
         empty_cols, new_vals = zip(*[['{}=?'.format(e),n] for e,o,n in zip(columns[1:],old[1:],new[1:]) if repr(o).lower() in ['','none','null'] and repr(n).lower() not in ['','none','null']])
-        if delete: db.list("DELETE FROM {} WHERE id={}".format(table, new[0]))
-        db.list("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals)), db.modify.commit()
+        if delete: db.modify("DELETE FROM {} WHERE id={}".format(table, new[0]))
+        db.modify("UPDATE {} SET {} WHERE id={}".format(table, ','.join(empty_cols), old[0]), tuple(new_vals))
       except:
-        if delete: db.list("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
+        if delete: db.modify("DELETE FROM {} WHERE id={}".format(table, new[0]))
         else: pass
     elif replace.lower()=='k' and 'k' in options: return [old[0],new[0]]
     elif replace.lower().startswith('sql ') and 'sql' in options: 
-      try: db.list(replace[4:]), db.modify.commit()
+      try: db.modify(replace[4:])
       except: pass 
   elif replace.lower()=='abort': return 'abort'
   elif not replace:
-    if delete: db.list("DELETE FROM {} WHERE id={}".format(table, new[0])), db.modify.commit()
+    if delete: db.modify("DELETE FROM {} WHERE id={}".format(table, new[0]))
     else: pass
