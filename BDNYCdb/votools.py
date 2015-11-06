@@ -81,14 +81,14 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False):
         for i in range(len(tabdata)):
             tmpcol = tabdata[i].keys()
             for elem in tmpcol:
-                if elem not in colnames:
-                    colnames.append(elem)
+                if elem not in colnames: colnames.append(elem)
 
     # Run through all the columns and create them
     for elem in colnames:
         table_add(t, tabdata, elem)
 
     # Output to a file
+    print 'Creating table...'
     votable = from_table(t)
     votable.set_all_tables_format('binary')
     votable.to_xml(tabname)
