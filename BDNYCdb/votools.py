@@ -29,7 +29,12 @@ def table_add(tab, data, col):
 
     x = []
     for i in range(len(data)):
-        temp = data[i][col]
+
+        # If the particular key is not present, create an empty value (used for photometry tables)
+        if col not in data[i]:
+            temp = ''
+        else:
+            temp = data[i][col]
 
         # Fix up None elements
         if temp is None:
@@ -51,6 +56,8 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False):
       SQL query dictionary list from running query_dict.execute()
     tabname: str
       The name of the VOTable to be created
+    phot: bool
+      Parameter specifying if the table contains photometry to be merged
 
     Returns
     -------
@@ -66,12 +73,16 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False):
     t = Table()
 
     colnames = tabdata[0].keys()
-    # If this is a photometry table, make sure to have the full list of columns
+
+    # If this is a photometry table, parse it and make sure to have the full list of columns
     if phot:
+        tabdata = photparse(tabdata)
+
         for i in range(len(tabdata)):
             tmpcol = tabdata[i].keys()
-            for elem in tmpcol: if elem not in colnames: colnames.append(elem)
-
+            for elem in tmpcol:
+                if elem not in colnames:
+                    colnames.append(elem)
 
     # Run through all the columns and create them
     for elem in colnames:
@@ -83,6 +94,38 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False):
     votable.to_xml(tabname)
 
     print 'Table created:', tabname
+
+
+def photaddline(tab, id):
+    """
+    Loop through the dictionary list **tab** creating a line for the source specified in **id**
+
+    :param tab:
+      Dictionary list of all the photometry data
+    :param id:
+      ID of source in the photometry table (source_id)
+    :return:
+      Dictionary with all the data for the specified source
+    """
+
+    colnames = tab[0].keys()
+    tmpdict = dict()
+    for i in range(len(tab)):
+
+        # If not working on the same source, continue
+        if tab[i]['source_id'] != id:
+            continue
+
+        for elem in colnames:
+            if elem not in ['comments','epoch','instrument_id','magnitude','magnitude_unc','publication_id','system','telescope_id']:
+                tmpdict[elem] = tab[i][elem]
+            elif elem == 'band':
+                continue
+            else:
+                tmpstr = tab[i]['band']+'.'+elem
+                tmpdict[tmpstr] = tab[i][elem]
+
+    return tmpdict
 
 
 def photparse(tab):
@@ -114,29 +157,13 @@ def photparse(tab):
         if tmpid not in uniqueid:
             uniqueid.append(tmpid)
 
-    # Create new table, copying over existing columns but adding new ones with the band names
+    # Loop over unique id and create a new table for each element in it
     newtab = []
-    colnames = tab[0].keys()
-    id0 = tab[0]['source_id']
-    for i in range(len(tab)):
-        tmpdict = dict()
+    for id in uniqueid:
+        tmpdict = photaddline(tab, id)
+        newtab.append(tmpdict)
 
-        # If not working on the same source, save the line and clear out the dictionary
-        if tab[i]['source_id'] != id0:
-            print tab[i]['source_id']
-            id0 = tab[i]['source_id']
-            newtab.append(tmpdict)
-            tmpdict.clear()
-
-        for elem in colnames:
-            if elem not in ['comments','epoch','instrument_id','magnitude','magnitude_unc','publication_id','system','telescope_id']:
-                tmpdict[elem] = tab[i][elem]
-            elif elem == 'band':
-                continue
-            else:
-                tmpstr = tab[i]['band']+'.'+elem
-                print tmpstr
-                tmpdict[tmpstr] = tab[i][elem]
+    return newtab
 
 
 
