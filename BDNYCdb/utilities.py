@@ -8,9 +8,9 @@ warnings.simplefilter('ignore')
 path = '/Users/Joe/Documents/Python/'
 
 def blackbody(lam, T, Flam=False, radius=1, dist=10, emitted=False):
-  '''
+  """
   Given a wavelength array [um] and temperature [K], returns an array of Planck function values in [erg s-1 cm-2 A-1]
-  '''
+  """
   lam, T = lam.to(q.cm), T*q.K
   I = np.pi*(2*ac.h*ac.c**2 / (lam**(4 if Flam else 5) * (np.exp((ac.h*ac.c / (lam*ac.k_B*T)).decompose()) - 1))).to(q.erg/q.s/q.cm**2/(1 if Flam else q.AA))
   return I if emitted else I*((ac.R_jup*radius/(dist*q.pc))**2).decompose()
@@ -44,9 +44,9 @@ def deg2sxg(ra='', dec=''):
   return (RA, DEC) if ra and dec else RA or DEC 
   
 def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', colsort='', row2='', preamble='', postamble='', empties=True, append=False, all_str=False, literal=False, blanks=r'\\nodata', LaTeX=False):
-  '''
+  """
   Given a nested dictionary *DICT*, writes a .txt file with keys as columns. 
-  '''
+  """
   import csv
   D = DICT.copy()
   if order:
@@ -95,20 +95,18 @@ def dict2txt(DICT, writefile, column1='-', delim='\t', digits='', order='', cols
     if postamble: writer.writerow([postamble])
       
 def distance(coord1, coord2):
-  '''
+  """
   Given n-dimensional coordinates of two points, returns the distance between them
-  '''
+  """
   return np.sqrt(sum([abs(i-j)**2 for i,j in zip(coord1,coord2)]))
 
 def filter_info(band):
-  '''
-  (By Joe Filippazzo)
-   
+  """
   Effective, min, and max wavelengths in [um] and zeropoint in [erg s-1 cm-2 A-1] and [photon s-1 cm-2 A-1] for SDSS, Bessel, 2MASS, IRAC and WISE filters IN THE VEGA SYSTEM. Values from SVO filter profile service.
   
   *band*
       Name of filter band (e.g. 'J' from 2MASS, 'W1' from WISE, etc.) or list of filter systems (e.g. ['SDSS','2MASS','WISE'])
-  '''
+  """
   Filters = { "FUV":     { 'eff': 0.154226, 'min': 0.134032, 'max': 0.180643, 'zp': 6.486734e-09, 'zp_photon': 5.035932e+02, 'toVega':0,      'ext': 2.62,   'system': 'GALEX' },
               "NUV":     { 'eff': 0.227437, 'min': 0.169252, 'max': 0.300667, 'zp': 4.511628e-09, 'zp_photon': 5.165788e+02, 'toVega':0,      'ext': 2.94,   'system': 'GALEX' },
 
@@ -187,7 +185,7 @@ def filter_info(band):
  
   
 def find(filename, tree):
-  '''                                                                               
+  """                                                                               
   For given filename and directory tree, returns the path to the file. 
   For only file extension given as filename, returns list of paths to all files with that extnsion in that directory tree.  
 
@@ -195,7 +193,7 @@ def find(filename, tree):
     Filename or file extension to search for (e.g. 'my_file.txt' or just '.txt')
   *tree*
     Directory tree base to start the walk (e.g. '/Users/Joe/Documents/')
-  '''
+  """
   import os
   result = []
 
@@ -220,9 +218,9 @@ def flux_calibrate(mag, dist, sig_m='', sig_d='', scale_to=10*q.pc):
   else: print 'Could not flux calibrate that input to distance {}.'.format(dist)
 
 def get_filters(filter_directories=['{}Filters/{}/'.format(path,i) for i in ['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA','DES']], systems=['2MASS','SDSS','WISE','IRAC','MIPS','HST','Bessel','MKO','GALEX','DENIS','GAIA','DES']):
-  '''
+  """
   Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1]. 
-  '''
+  """
   files = glob.glob(filter_directories+'*.txt') if isinstance(filter_directories, basestring) else [j for k in [glob.glob(i+'*.txt') for i in filter_directories] for j in k]
 
   if len(files) == 0: print 'No filters in', filter_directories
@@ -275,9 +273,9 @@ def idx_exclude(x, exclude):
     except TypeError: return range(len(x))
 
 def inject_average(spectrum, position, direction, n=10):
-  '''
+  """
   Used to smooth edges after trimming a spectrum. Injects a new data point into a *spectrum* at given *position* with flux value equal to the average of the *n* elements in the given *direction*.
-  '''
+  """
   units, spectrum, rows = [i.unit if hasattr(i,'unit') else 1 for i in spectrum], [i.value if hasattr(i,'unit') else i for i in spectrum], zip(*[i.value if hasattr(i,'unit') else i for i in spectrum])
   new_pos = [position, np.interp(position, spectrum[0], spectrum[1]), np.interp(position, spectrum[0], spectrum[2])]
   rows = sorted(map(list,rows)+[new_pos])
@@ -290,18 +288,18 @@ def inject_average(spectrum, position, direction, n=10):
 def Jy2mag(band, jy, jy_unc, filter_dict=''): return flux2mag(band, (ac.c*jy/filter_dict[band]['eff']**2).to(q.erg/q.s/q.cm**2/q.AA), sig_f=(ac.c*jy_unc/filter_dict[band]['eff']**2).to(q.erg/q.s/q.cm**2/q.AA), photon=False, filter_dict=filter_dict)
 
 def mag2flux(band, mag, sig_m='', photon=False, filter_dict=''):
-  '''
+  """
   For given band and magnitude returns the flux value (and uncertainty if *sig_m*) in [ergs][s-1][cm-2][A-1]
-  '''
+  """
   filt = filter_dict[band]
   f = (filt['zp_photon' if photon else 'zp']*10**(-mag/2.5)).to((1 if photon else q.erg)/q.s/q.cm**2/q.AA)
   sig_f = f*sig_m*np.log(10)/2.5 if sig_m else ''
   return [f, sig_f]
   
 def flux2mag(band, f, sig_f='', photon=False, filter_dict=''): 
-  '''
+  """
   For given band and flux returns the magnitude value (and uncertainty if *sig_f*)
-  '''
+  """
   filt = filter_dict[band]
   if f.unit=='Jy': f, sig_f = (ac.c*f/filt['eff']**2).to(q.erg/q.s/q.cm**2/q.AA), (ac.c*sig_f/filt['eff']**2).to(q.erg/q.s/q.cm**2/q.AA)
   if photon: f, sig_f = (f*(filt['eff']/(ac.h*ac.c)).to(1/q.erg)).to(1/q.s/q.cm**2/q.AA), (sig_f*(filt['eff']/(ac.h*ac.c)).to(1/q.erg)).to(1/q.s/q.cm**2/q.AA)
@@ -310,7 +308,7 @@ def flux2mag(band, f, sig_f='', photon=False, filter_dict=''):
   return [m,sig_m]
 
 def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', styles='', text_colors='', fontsize=14, overplot='', bbox_to_anchor='', loc=0, ncol=1, figlegend=False):
-  '''
+  """
   Add manually created legends to plots and subplots
   *labels*
     A list of strings to appear as legend text, e.g. ['Foo','Bar','Baz']
@@ -334,7 +332,7 @@ def manual_legend(labels, colors, markers='', edges='', sizes='', errors='', sty
     The 0-8 integer location of the legend
   *ncol*
     The integer number of columns to divide the legend markers into
-  '''
+  """
   ax = overplot or plt.gca()
   handles = [plt.errorbar((1,0), (0,0), xerr=[0,0] if r else None, yerr=[0,0] if r else None, marker=m if t=='p' else '', color=c, ls=m if t=='l' else 'none', lw=5 if m==':' else 2, markersize=s, markerfacecolor=c, markeredgecolor=e, markeredgewidth=2, capsize=0, ecolor=e) for m,c,e,s,r,t in zip(markers or ['o' for i in colors], colors, edges or colors, sizes or [10 for i in colors], errors or [False for i in colors], styles or ['p' for i in colors])]
   [i[0].remove() for i in handles]
@@ -369,9 +367,9 @@ def marginalized_distribution(data, figure='', xunits='', yunits='', xy='', colo
   return [teff, teff_frac, logg, logg_frac, P[0][0]]
 
 def montecarlo(spectrum, modelDict, N=100, exclude=[], save=''):
-  '''
+  """
   For given *spectrum* and dictionary of models *modelDict*, runs a Monte Carlo simulation *N* times on each model
-  '''
+  """
   G = []
   for p in modelDict.keys():
     model, g = rebin_spec([modelDict[p]['wavelength'],modelDict[p]['flux']], spectrum[0]), []
@@ -382,9 +380,9 @@ def montecarlo(spectrum, modelDict, N=100, exclude=[], save=''):
   return marginalized_distribution([teff, logg, fits, params], save=save)
 
 def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, d='', sig_d='', exclude=[], plot=False, Rlim=(0,100), Tlim=(700,3000), title='', weighting=True, verbose=False, save=''):
-  '''
+  """
   For given *spectrum* [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.
-  '''
+  """
   for b in photometry.keys():
     if 'unc' not in b:
       if not photometry[b] or not photometry[b+'_unc']: photometry.pop(b), photometry.pop(b+'_unc')
@@ -419,9 +417,9 @@ def modelFit(fit, spectrum, photometry, photDict, specDict, filtDict, d='', sig_
   # return [final_spec, best[1], best[2], best[3], best[4], best[5]]
 
 def modelInterp(params, model_dict, filt_dict=None, plot=False):
-  '''
+  """
   Returns the interpolated model atmosphere spectrum (if model_dict==spec_dict) or photometry (if model_dict==phot_dict and filt_dict provided)
-  '''
+  """
   t, g = int(params.split()[0]), params.split()[1]
   p1, p2 = sorted(zip(*nsmallest(2,[[abs(int(k.split()[0])-t),k] for k in model_dict.keys() if g in k]))[1])
   t1, t2 = int(p1.split()[0]), int(p2.split()[0])
@@ -442,9 +440,9 @@ def modelInterp(params, model_dict, filt_dict=None, plot=False):
     return [w1,F]
   
 def modelReplace(spectrum, model, replace=[], tails=False, plot=False):
-  '''
+  """
   Returns the given *spectrum* with the tuple termranges in *replace* replaced by the given *model*.
-  '''
+  """
   Spec, mSpec = [[i.value if hasattr(i,'unit') else i for i in j] for j in [spectrum,model]]
   if tails: replace += [(0.3,Spec[0][0]),(Spec[0][-1],30)]
   Spec, mSpec = [i[idx_exclude(Spec[0],replace)] for i in Spec], [i[idx_include(mSpec[0],replace)] for i in mSpec]
@@ -453,9 +451,9 @@ def modelReplace(spectrum, model, replace=[], tails=False, plot=False):
   return [i*j for i,j in zip(newSpec,[k.unit if hasattr(k,'unit') else 1 for k in spectrum])]
 
 def multiplot(rows, columns, ylabel='', xlabel='', xlabelpad='', ylabelpad='', hspace=0, wspace=0, figsize=(15,7), fontsize=22, sharey=True, sharex=True):
-  '''
+  """
   Creates subplots with given number or *rows* and *columns*.
-  '''
+  """
   fig, axes = plt.subplots(rows, columns, sharey=sharey, sharex=sharex, figsize=figsize)
   plt.rc('text', usetex=True, fontsize=fontsize)
   if ylabel:
@@ -474,7 +472,7 @@ def multiplot(rows, columns, ylabel='', xlabel='', xlabelpad='', ylabelpad='', h
   return [fig]+list(axes)
   
 def norm_spec(spectrum, template, exclude=[], include=[]):
-  '''
+  """
   Parameters
   ----------
   spectrum: sequence
@@ -490,7 +488,7 @@ def norm_spec(spectrum, template, exclude=[], include=[]):
   -------
   spectrum: sequence
     The normalized [w,f] or [w,f,e] astropy quantities spectrum
-  '''
+  """
   s0, t0 = [np.ma.masked_where(~np.logical_and(a[0]>b[0][0],a[0]<b[0][-1]), a[1]) for a,b in [[spectrum,template],[template,spectrum]]]
   norm = np.trapz(t0, x=template[0].value)/np.trapz(s0, x=spectrum[0].value)
   spectrum[1] *= norm
@@ -499,15 +497,15 @@ def norm_spec(spectrum, template, exclude=[], include=[]):
   return spectrum
 
 def norm_to_mag(spectrum, magnitude, band): 
-  '''
+  """
   Returns the flux of a given *spectrum* [W,F] normalized to the given *magnitude* in the specified photometric *band*
-  '''
+  """
   return [spectrum[0],spectrum[1]*magnitude/s.get_mag(band, spectrum, to_flux=True, Flam=False)[0],spectrum[2]]
 
 def group_spectra(spectra):
-  '''
+  """
   Puts a list of *spectra* into groups with overlapping wavelength arrays
-  '''
+  """
   groups, idx, i = [], [], 'wavelength' if isinstance(spectra[0],dict) else 0
   for N,S in enumerate(spectra):
     if N not in idx:
@@ -518,9 +516,9 @@ def group_spectra(spectra):
   return groups
   
 def make_composite(spectra):
-  '''
+  """
   Creates a composite spectrum from a list of overlapping *spectra*
-  '''
+  """
   units = [i.unit for i in spectra[0]]
   spectrum = spectra.pop(0)
   if spectra:
@@ -537,10 +535,10 @@ def make_composite(spectra):
   return [i*Q for i,Q in zip([i.value if hasattr(i,'unit') else i for i in spectrum],units)]
 
 def normalize(spectra, template, composite=True, plot=False, SNR=50, exclude=[], trim=[], replace=[], D_Flam=None):
-  '''
+  """
   Normalizes a list of *spectra* with [W,F,E] or [W,F] to a *template* spectrum.
   Returns one normalized, composite spectrum if *composite*, else returns the list of *spectra* normalized to the *template*.
-  '''
+  """
   if not template: 
     spectra = [scrub(i) for i in sorted(spectra, key=lambda x: x[1][-1])]
     template = spectra.pop()
@@ -612,9 +610,9 @@ def polynomial(n, m, sig='', x='x', y='y', title='', degree=1, c='k', ls='--', l
 def poly_print(coeff_list, x='x', y='y'): return '{} ={}'.format(y,' '.join(['{}{:.3e}{}'.format(' + ' if i>0 else ' - ', abs(i), '{}{}'.format(x if n>0 else '', '^{}'.format(n) if n>1 else '')) for n,i in enumerate(coeff_list[::-1])][::-1]))
 
 def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], skip=[], empties=True, title=False):
-  '''
+  """
   Prints a nice table of *values* with *labels* with auto widths else maximum width if *same* else *col_len* if specified. 
-  '''
+  """
   def red(t): print "\033[01;31m{0}\033[00m".format(t),
   # if not to_txt: print '\r'
   labels = list(labels)
@@ -649,7 +647,7 @@ def printer(labels, values, format='', truncate=150, to_txt=None, highlight=[], 
   if not to_txt: print '\n'
 
 def read_spec(specFiles, errors=True, atomicron=False, negtonan=False, plot=False, linear=False, wlog=False, verbose=True):
-    '''
+    """
     (by Alejandro N |uacute| |ntilde| ez, Jocelyn Ferrara)
     
     Read spectral data from fits or ascii files. It returns a list of numpy arrays with wavelength in position 0, flux in position 1 and error values (if requested) in position 2. More than one file name can be provided simultaneously.
@@ -670,7 +668,7 @@ def read_spec(specFiles, errors=True, atomicron=False, negtonan=False, plot=Fals
       Boolean, whether to return spectrum only if it is linear. If it cannot verify linearity, it will assume linearity.
     *verbose*
       Boolean, whether to print warning messages.
-    '''
+    """
     
     # 1. Convert specFiles into a list type if it is only one file name
     if isinstance(specFiles, str):
@@ -810,17 +808,17 @@ def rebin_spec(spec, wavnew, waveunits='um'):
 #   return [wavnew, f, e]
 
 def rgb_image(images, save=''):
-  '''
+  """
   Saves an RGB false color image at *save* made from a stack of three *images*
   From the APLpy (Apple Pie) module (http://aplpy.readthedocs.org/en/latest/howto_rgb.html)
-  '''
+  """
   import aplpy
   aplpy.make_rgb_image(images,save)
   
 def separation(ra1, dec1, ra2, dec2):
-  '''
+  """
   Given coordinates *ra1*, *dec1*, *ra2*, *dec2* of two objects, returns the angular separation in arcseconds.
-  '''
+  """
   if isinstance(ra1,str): ra1 = float(ra1) if ra1.isdigit() else sxg2deg(ra=ra1)
   if isinstance(dec1,str): dec1 = float(dec1) if dec1.isdigit() else sxg2deg(dec=dec1)
   if isinstance(ra2,str): ra2 = float(ra2) if ra2.isdigit() else sxg2deg(ra=ra2)
@@ -830,13 +828,13 @@ def separation(ra1, dec1, ra2, dec2):
   except TypeError: return None
 
 def sameName(name1, name2, chars=4):
-  '''
+  """
   Boolean: Given names of two objects, checks that they have a certain number of name characters in common 
   Note: discounts '2' in object names with '2MASS' or '2m'
 
   *chars*
    Number of consecutive characters to match, 4 by default. (e.g '2m0355' and '2MASSJ0355+1234' have '0355' in common with chars=4)
-  '''
+  """
   import re
   def clean(name):
     for i in ['2MASS', '2mass', '2M', '2m']:
@@ -848,9 +846,9 @@ def sameName(name1, name2, chars=4):
   return True if re.sub('\D','',clean(str(name1)))[:chars] == re.sub('\D','',clean(str(name2)))[:chars] else False
 
 def scrub(data):
-  '''
+  """
   For input data [w,f,e] or [w,f] returns the list with NaN, negative, and zero flux (and corresponsing wavelengths and errors) removed. 
-  '''
+  """
   units = [i.unit if hasattr(i,'unit') else 1 for i in data]
   data = [np.asarray(i.value if hasattr(i,'unit') else i, dtype=np.float32) for i in data if isinstance(i,np.ndarray)]
   data = [i[np.where(~np.isinf(data[1]))] for i in data]
@@ -869,14 +867,14 @@ def smooth(x,beta):
   return y[5:len(y)-5]*(x.unit if hasattr(x, 'unit') else 1)
   
 def specType(SpT):
-  '''
+  """
   (By Joe Filippazzo)
 
   Converts between float and letter/number M, L, T and Y spectral types (e.g. 14.5 => 'L4.5' and 'T3' => 23).
 
   *SpT*
     Float spectral type between 0.0 and 39.9 or letter/number spectral type between M0.0 and Y9.9
-  '''
+  """
   if isinstance(SpT,str) and SpT[0] in ['M','L','T','Y']:
     try: return [l+float(SpT[1:]) for m,l in zip(['M','L','T','Y'],[0,10,20,30]) if m == SpT[0]][0]
     except: print "Spectral type must be a float between 0 and 40 or a string of class M, L, T or Y."; return SpT
@@ -886,7 +884,7 @@ def specType(SpT):
   else: return SpT
   
 def str2Q(x,target=''):
-  '''
+  """
   Given a string of units unconnected to a number, returns the units as a quantity to be multiplied with the number. 
   Inverse units must be represented by a forward-slash prefix or negative power suffix, e.g. inverse square seconds may be "/s2" or "s-2" 
 
@@ -894,7 +892,7 @@ def str2Q(x,target=''):
     The units as a string, e.g. str2Q('W/m2/um') => np.array(1.0) * W/(m**2*um)
   *target*
     The target units as a string if rescaling is necessary, e.g. str2Q('Wm-2um-1',target='erg/s/cm2/cm') => np.array(10000000.0) * erg/(cm**3*s)
-  '''
+  """
   if x:       
     def Q(IN):
       OUT = 1
@@ -919,9 +917,9 @@ def str2Q(x,target=''):
     return q.Unit('')
       
 def squaredError(a, b, c):
-  '''
+  """
   Computes the squared error of two arrays. Pass to scipy.optimize.fmin() to find least square or use scipy.optimize.leastsq()
-  '''
+  """
   a -= b
   a *= a 
   c = np.array([1 if np.isnan(e) else e for e in c])
@@ -934,9 +932,9 @@ def sxg2deg(ra='', dec=''):
   return (RA, DEC) if ra and dec else RA or DEC
 
 def tails(spectrum, model, plot=False):
-  '''
+  """
   Appends the Wein and Rayleigh-Jeans tails of the *model* to the given *spectrum*
-  '''
+  """
   start, end = np.where(model[0]<spectrum[0][0])[0], np.where(model[0]>spectrum[0][-1])[0]
   final = [np.concatenate(i) for i in [[model[0][start],spectrum[0],model[0][end]], [model[1][start],spectrum[1],model[1][end]], [np.zeros(len(start)),spectrum[2],np.zeros(len(end))]]]  
   if plot: plt.loglog(*spectrum[:2]), plt.loglog(model[0],model[1]), plt.loglog(*final[:2], color='k', ls='--')
@@ -964,11 +962,11 @@ def trim_spectrum(spectrum, regions, smooth_edges=False):
   return trimmed_spec
 
 def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False, obj_col=0, key_row=0, start=1):
-  '''
+  """
   For given *txtfile* returns a parent dictionary with keys from *obj_col* and child dictionaries with keys from *key_row*, delimited by *delim* character.
   Characters to *ignore*, entire lines to *skip*, and the data row to *start* at can all be specified.
   Floats and integers are returned as numbers unless *all_str* is set True.
-  '''
+  """
   def replace_all(text, dic):
     for i in dic: text = text.replace(i,' ')
     return text
@@ -984,19 +982,19 @@ def txt2dict(txtfile, delim='', skip=[], ignore=[], to_list=False, all_str=False
   else: return d if to_list else {row[0]:{k:float(v) if v.replace('-','').replace('.','').isdigit() and '-' not in v[1:] else str(v).replace('\"','').replace('\'','') if isinstance(v,unicode) else True if v=='True' else False if v=='False' else v.replace('\"','').replace('\'','') for k,v in zip(keys,row[1:])} for row in d}
 
 def try_except(success, failure, exceptions):
-  '''
+  """
   Replaces the multi-line try/except statement with a function
-  '''
+  """
   try:
     return success() if callable(success) else success
   except exceptions or Exception:
     return failure() if callable(failure) else failure      
 
 def unc(spectrum, SNR=20):
-  '''
+  """
   Removes NaNs negatives and zeroes from *spectrum* arrays of form [W,F] or [W,F,E].
   Generates E at signal to noise *SNR* for [W,F] and replaces NaNs with the same for [W,F,E]. 
-  '''
+  """
   S = scrub(spectrum)
   if len(S)==3:
     try: S[2] = np.array([i/SNR if np.isnan(j) else j for i,j in zip(S[1],S[2])], dtype='float32')*(S[1].unit if hasattr(S[1],'unit') else 1)
