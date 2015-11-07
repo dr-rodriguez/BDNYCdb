@@ -9,9 +9,12 @@ Welcome to BDNYCdb's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
-   BDNYCdb
+   ..automodule:: BDNYCdb/BDdb
+      :members:
+   ..automodule:: BDNYCdb/utilities
+      :members:
 
 
 Indices and tables
