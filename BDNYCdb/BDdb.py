@@ -91,6 +91,8 @@ class get_db:
       The name of the table into which the data should be inserted
     delimiter: str
       The string to use as the delimiter when parsing the ascii file
+    multiband: bool
+      Digest columns of multiple photometric measurements (e.g. J, H, Ks) into individual rows of data for database insertion
 
     Returns
     -------
@@ -141,7 +143,7 @@ class get_db:
       for item in update:
         record = self.list("SELECT * FROM {} WHERE id={}".format(table, item[columns.index('id')])).fetchone()
         if record: compare_records(self, table, columns, record, item)
-    # self.clean_up(table)
+    self.clean_up(table)
    
   def add_ascii(self, asciiPath, source_id, header_chars=['#'], start=0, snrPath='', headerPath='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', regime='', airmass=0, comment=''): 
     """
