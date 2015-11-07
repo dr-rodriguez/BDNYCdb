@@ -1,0 +1,64 @@
+Sources Table
+=============
+
+Below is the data the Sources table takes.
+
+
+id
+---
+
+The identifying integer of the source.  Appears as "source_id in every other table."
+
+
+ra
+---
+
+Right Ascension.  One of the two coordinates specifying location of the object.  Written as degrees with decimals.
+
+
+dec
+---
+
+Declination.  The second of two coordinates specifying location of the object.  Written as hours with decimals.
+
+
+designation
+-----------
+
+The most prominant identifyer of the object in other databases, such as SIMBAD.
+
+
+Publication_id
+--------------
+
+The integer front the "publication" table corresponding to the paper in which the discovery of the source was first announced. 
+
+
+comments
+--------
+
+Any additional potentially useful informaiton.
+
+
+Unum
+----
+
+U-number.  A different unique identifyer for some objects that includes limited information. 
+
+
+shortname
+---------
+
+The basic coordinates of the object in sexidecimal notation.  
+
+
+names
+-----
+
+Any additional names assigned to the object, i.e. from other surveys. 
+
+
+components
+----------
+
+*Currently blank* 

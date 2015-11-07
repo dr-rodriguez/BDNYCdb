@@ -1,0 +1,372 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>utilities module &mdash; BDNYC Database 1.0.0 documentation</title>
+    
+    <link rel="stylesheet" href="static/agogo.css" type="text/css" />
+    <link rel="stylesheet" href="static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="static/jquery.js"></script>
+    <script type="text/javascript" src="static/underscore.js"></script>
+    <script type="text/javascript" src="static/doctools.js"></script>
+    <link rel="top" title="BDNYC Database 1.0.0 documentation" href="index.html" />
+    <link rel="next" title="astrotools module" href="astrotools.html" />
+    <link rel="prev" title="BDdb module" href="BDdb.html" /> 
+  </head>
+  <body>
+    <div class="header-wrapper">
+      <div class="header">
+        <div class="headertitle"><a
+          href="index.html">BDNYC Database 1.0.0 documentation</a></div>
+        <div class="rel">
+          <a href="BDdb.html" title="BDdb module"
+             accesskey="P">previous</a> |
+          <a href="astrotools.html" title="astrotools module"
+             accesskey="N">next</a> |
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a>
+        </div>
+       </div>
+    </div>
+
+    <div class="content-wrapper">
+      <div class="content">
+        <div class="document">
+            
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-utilities">
+<span id="utilities-module"></span><h1>utilities module<a class="headerlink" href="#module-utilities" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="utilities.app2abs">
+<tt class="descclassname">utilities.</tt><tt class="descname">app2abs</tt><big>(</big><em>mag</em>, <em>dist</em>, <em>sig_m=''</em>, <em>sig_d=''</em>, <em>flux=False</em><big>)</big><a class="headerlink" href="#utilities.app2abs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.blackbody">
+<tt class="descclassname">utilities.</tt><tt class="descname">blackbody</tt><big>(</big><em>lam</em>, <em>T</em>, <em>Flam=False</em>, <em>radius=1</em>, <em>dist=10</em>, <em>emitted=False</em><big>)</big><a class="headerlink" href="#utilities.blackbody" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a wavelength array [um] and temperature [K], returns an array of Planck function values in [erg s-1 cm-2 A-1]</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.contour_plot">
+<tt class="descclassname">utilities.</tt><tt class="descname">contour_plot</tt><big>(</big><em>x</em>, <em>y</em>, <em>z</em>, <em>best=False</em>, <em>figsize=(8</em>, <em>8)</em>, <em>levels=20</em>, <em>cmap=&lt;matplotlib.colors.LinearSegmentedColormap object at 0x1037f1dd0&gt;</em><big>)</big><a class="headerlink" href="#utilities.contour_plot" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.deg2sxg">
+<tt class="descclassname">utilities.</tt><tt class="descname">deg2sxg</tt><big>(</big><em>ra=''</em>, <em>dec=''</em><big>)</big><a class="headerlink" href="#utilities.deg2sxg" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.dict2txt">
+<tt class="descclassname">utilities.</tt><tt class="descname">dict2txt</tt><big>(</big><em>DICT</em>, <em>writefile</em>, <em>column1='-'</em>, <em>delim='\t'</em>, <em>digits=6</em>, <em>order=''</em>, <em>empties=False</em>, <em>append=False</em><big>)</big><a class="headerlink" href="#utilities.dict2txt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a nested dictionary <em>DICT</em>, writes a .txt file with keys as columns.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.distance">
+<tt class="descclassname">utilities.</tt><tt class="descname">distance</tt><big>(</big><em>coord1</em>, <em>coord2</em><big>)</big><a class="headerlink" href="#utilities.distance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given n-dimensional coordinates of two points, returns the distance between them</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.find">
+<tt class="descclassname">utilities.</tt><tt class="descname">find</tt><big>(</big><em>filename</em>, <em>tree</em><big>)</big><a class="headerlink" href="#utilities.find" title="Permalink to this definition">¶</a></dt>
+<dd><p>For given filename and directory tree, returns the path to the file. 
+For only file extension given as filename, returns list of paths to all files with that extnsion in that directory tree.</p>
+<dl class="docutils">
+<dt><em>filename</em></dt>
+<dd>Filename or file extension to search for (e.g. &#8216;my_file.txt&#8217; or just &#8216;.txt&#8217;)</dd>
+<dt><em>tree</em></dt>
+<dd>Directory tree base to start the walk (e.g. &#8216;/Users/Joe/Documents/&#8217;)</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.flux2mag">
+<tt class="descclassname">utilities.</tt><tt class="descname">flux2mag</tt><big>(</big><em>band</em>, <em>flux</em>, <em>sig_f=''</em>, <em>photon=True</em><big>)</big><a class="headerlink" href="#utilities.flux2mag" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.get_filters">
+<tt class="descclassname">utilities.</tt><tt class="descname">get_filters</tt><big>(</big><em>filter_directories=['/Users/Joe/Documents/Python/Filters/2MASS/', '/Users/Joe/Documents/Python/Filters/SDSS/', '/Users/Joe/Documents/Python/Filters/WISE/', '/Users/Joe/Documents/Python/Filters/IRAC/', '/Users/Joe/Documents/Python/Filters/HST/', '/Users/Joe/Documents/Python/Filters/Bessel/', '/Users/Joe/Documents/Python/Filters/MKO/', '/Users/Joe/Documents/Python/Filters/GALEX/', '/Users/Joe/Documents/Python/Filters/DENIS/'], systems=['2MASS', 'SDSS', 'WISE', 'IRAC', 'HST', 'Bessel', 'MKO', 'GALEX', 'DENIS']</em><big>)</big><a class="headerlink" href="#utilities.get_filters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1].</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.goodness">
+<tt class="descclassname">utilities.</tt><tt class="descname">goodness</tt><big>(</big><em>spec1</em>, <em>spec2</em>, <em>array=False</em>, <em>exclude=</em>, <span class="optional">[</span><span class="optional">]</span><em>filt_dict=None</em>, <em>weighting=True</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#utilities.goodness" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.group">
+<tt class="descclassname">utilities.</tt><tt class="descname">group</tt><big>(</big><em>lst</em>, <em>n</em><big>)</big><a class="headerlink" href="#utilities.group" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.idx_exclude">
+<tt class="descclassname">utilities.</tt><tt class="descname">idx_exclude</tt><big>(</big><em>x</em>, <em>exclude</em><big>)</big><a class="headerlink" href="#utilities.idx_exclude" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.idx_include">
+<tt class="descclassname">utilities.</tt><tt class="descname">idx_include</tt><big>(</big><em>x</em>, <em>include</em><big>)</big><a class="headerlink" href="#utilities.idx_include" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.mag2flux">
+<tt class="descclassname">utilities.</tt><tt class="descname">mag2flux</tt><big>(</big><em>band</em>, <em>mag</em>, <em>sig_m=''</em>, <em>photon=False</em><big>)</big><a class="headerlink" href="#utilities.mag2flux" title="Permalink to this definition">¶</a></dt>
+<dd><p>For given band and magnitude, returns the flux value in [ergs][s-1][cm-2][A-1]
+mag = -2.5*log10(F/zp)  =&gt;  flux = zp*10**(-mag/2.5)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.marginalized_distribution">
+<tt class="descclassname">utilities.</tt><tt class="descname">marginalized_distribution</tt><big>(</big><em>data</em>, <em>figure=''</em>, <em>xunits=''</em>, <em>yunits=''</em>, <em>xy=''</em>, <em>color='b'</em>, <em>marker='o'</em>, <em>markersize=8</em>, <em>contour=True</em>, <em>save=''</em><big>)</big><a class="headerlink" href="#utilities.marginalized_distribution" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.modelFit">
+<tt class="descclassname">utilities.</tt><tt class="descname">modelFit</tt><big>(</big><em>fit</em>, <em>spectrum</em>, <em>photometry</em>, <em>photDict</em>, <em>specDict</em>, <em>filtDict</em>, <em>d=''</em>, <em>sig_d=''</em>, <em>exclude=</em>, <span class="optional">[</span><span class="optional">]</span><em>plot=False</em>, <em>Rlim=(0</em>, <em>100)</em>, <em>Tlim=(700</em>, <em>3000)</em>, <em>title=''</em>, <em>weighting=True</em>, <em>verbose=False</em>, <em>save=''</em><big>)</big><a class="headerlink" href="#utilities.modelFit" title="Permalink to this definition">¶</a></dt>
+<dd><p>For given <em>spectrum</em> [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.modelInterp">
+<tt class="descclassname">utilities.</tt><tt class="descname">modelInterp</tt><big>(</big><em>params</em>, <em>model_dict</em>, <em>filt_dict=None</em>, <em>plot=False</em><big>)</big><a class="headerlink" href="#utilities.modelInterp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the interpolated model atmosphere spectrum (if model_dict==spec_dict) or photometry (if model_dict==phot_dict and filt_dict provided)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.modelReplace">
+<tt class="descclassname">utilities.</tt><tt class="descname">modelReplace</tt><big>(</big><em>spectrum</em>, <em>model</em>, <em>replace=</em>, <span class="optional">[</span><span class="optional">]</span><em>tails=False</em>, <em>plot=False</em><big>)</big><a class="headerlink" href="#utilities.modelReplace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the given <em>spectrum</em> with the tuple termranges in <em>replace</em> replaced by the given <em>model</em>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.montecarlo">
+<tt class="descclassname">utilities.</tt><tt class="descname">montecarlo</tt><big>(</big><em>spectrum</em>, <em>modelDict</em>, <em>N=100</em>, <em>exclude=</em>, <span class="optional">[</span><span class="optional">]</span><em>save=''</em><big>)</big><a class="headerlink" href="#utilities.montecarlo" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.norm_spec">
+<tt class="descclassname">utilities.</tt><tt class="descname">norm_spec</tt><big>(</big><em>spectrum</em>, <em>template</em>, <em>exclude=</em>, <span class="optional">[</span><span class="optional">]</span><em>include=</em><span class="optional">[</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#utilities.norm_spec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns <em>spectrum</em> with [W,F] or [W,F,E] normalized to <em>template</em> [W,F] or [W,F,E].
+Wavelength range tuples provided in <em>exclude</em> argument are ignored during normalization, i.e. exclude=[(0.65,0.72),(0.92,0.97)].</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.normalize">
+<tt class="descclassname">utilities.</tt><tt class="descname">normalize</tt><big>(</big><em>spectra</em>, <em>template</em>, <em>composite=True</em>, <em>plot=False</em>, <em>SNR=50</em>, <em>exclude=</em>, <span class="optional">[</span><span class="optional">]</span><em>trim=</em>, <span class="optional">[</span><span class="optional">]</span><em>replace=</em>, <span class="optional">[</span><span class="optional">]</span><em>D_Flam=None</em><big>)</big><a class="headerlink" href="#utilities.normalize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Normalizes a list of <em>spectra</em> with [W,F,E] or [W,F] to a <em>template</em> spectrum.
+Returns one normalized, composite spectrum if <em>composite</em>, else returns the list of <em>spectra</em> normalized to the <em>template</em>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.pi2pc">
+<tt class="descclassname">utilities.</tt><tt class="descname">pi2pc</tt><big>(</big><em>parallax</em><big>)</big><a class="headerlink" href="#utilities.pi2pc" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.polynomial">
+<tt class="descclassname">utilities.</tt><tt class="descname">polynomial</tt><big>(</big><em>n</em>, <em>m</em>, <em>sig=''</em>, <em>degree=1</em>, <em>c='k'</em>, <em>ls='-'</em><big>)</big><a class="headerlink" href="#utilities.polynomial" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.printer">
+<tt class="descclassname">utilities.</tt><tt class="descname">printer</tt><big>(</big><em>labels</em>, <em>values</em>, <em>format=''</em>, <em>truncate=150</em>, <em>to_txt=None</em>, <em>highlight=</em>, <span class="optional">[</span><span class="optional">]</span><em>skip=</em>, <span class="optional">[</span><span class="optional">]</span><em>empties=False</em>, <em>title=False</em><big>)</big><a class="headerlink" href="#utilities.printer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Prints a nice table of <em>values</em> with <em>labels</em> with auto widths else maximum width if <em>same</em> else <em>col_len</em> if specified.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.random">
+<tt class="descclassname">utilities.</tt><tt class="descname">random</tt><big>(</big><big>)</big> &rarr; x in the interval [0, 1).<a class="headerlink" href="#utilities.random" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.rebin_spec">
+<tt class="descclassname">utilities.</tt><tt class="descname">rebin_spec</tt><big>(</big><em>spec</em>, <em>wavnew</em>, <em>waveunits='um'</em><big>)</big><a class="headerlink" href="#utilities.rebin_spec" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.rgb_image">
+<tt class="descclassname">utilities.</tt><tt class="descname">rgb_image</tt><big>(</big><em>images</em>, <em>save=''</em><big>)</big><a class="headerlink" href="#utilities.rgb_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves an RGB false color image at <em>save</em> made from a stack of three <em>images</em>
+From the APLpy (Apple Pie) module (<a class="reference external" href="http://aplpy.readthedocs.org/en/latest/howto_rgb.html">http://aplpy.readthedocs.org/en/latest/howto_rgb.html</a>)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.sameName">
+<tt class="descclassname">utilities.</tt><tt class="descname">sameName</tt><big>(</big><em>name1</em>, <em>name2</em>, <em>chars=4</em><big>)</big><a class="headerlink" href="#utilities.sameName" title="Permalink to this definition">¶</a></dt>
+<dd><p>Boolean: Given names of two objects, checks that they have a certain number of name characters in common 
+Note: discounts &#8216;2&#8217; in object names with &#8216;2MASS&#8217; or &#8216;2m&#8217;</p>
+<dl class="docutils">
+<dt><em>chars</em></dt>
+<dd>Number of consecutive characters to match, 4 by default. (e.g &#8216;2m0355&#8217; and &#8216;2MASSJ0355+1234&#8217; have &#8216;0355&#8217; in common with chars=4)</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.scrub">
+<tt class="descclassname">utilities.</tt><tt class="descname">scrub</tt><big>(</big><em>data</em><big>)</big><a class="headerlink" href="#utilities.scrub" title="Permalink to this definition">¶</a></dt>
+<dd><p>For input data [w,f,e] or [w,f] returns the list with NaN, negative, and zero flux (and corresponsing wavelengths and errors) removed.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.separation">
+<tt class="descclassname">utilities.</tt><tt class="descname">separation</tt><big>(</big><em>ra1</em>, <em>dec1</em>, <em>ra2</em>, <em>dec2</em><big>)</big><a class="headerlink" href="#utilities.separation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given coordinates <em>ra1</em>, <em>dec1</em>, <em>ra2</em>, <em>dec2</em> of two objects, returns the angular separation in arcseconds.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.smooth">
+<tt class="descclassname">utilities.</tt><tt class="descname">smooth</tt><big>(</big><em>x</em>, <em>beta</em><big>)</big><a class="headerlink" href="#utilities.smooth" title="Permalink to this definition">¶</a></dt>
+<dd><p>Smooths a spectrum <em>x</em> using a Kaiser-Bessel smoothing window of narrowness <em>beta</em> (~1 =&gt; very smooth, ~100 =&gt; not smooth)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.specType">
+<tt class="descclassname">utilities.</tt><tt class="descname">specType</tt><big>(</big><em>SpT</em><big>)</big><a class="headerlink" href="#utilities.specType" title="Permalink to this definition">¶</a></dt>
+<dd><p>(By Joe Filippazzo)</p>
+<p>Converts between float and letter/number M, L, T and Y spectral types (e.g. 14.5 =&gt; &#8216;L4.5&#8217; and &#8216;T3&#8217; =&gt; 23).</p>
+<dl class="docutils">
+<dt><em>SpT</em></dt>
+<dd>Float spectral type between 0.0 and 39.9 or letter/number spectral type between M0.0 and Y9.9</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.squaredError">
+<tt class="descclassname">utilities.</tt><tt class="descname">squaredError</tt><big>(</big><em>a</em>, <em>b</em>, <em>c</em><big>)</big><a class="headerlink" href="#utilities.squaredError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the squared error of two arrays. Pass to scipy.optimize.fmin() to find least square or use scipy.optimize.leastsq()</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.str2Q">
+<tt class="descclassname">utilities.</tt><tt class="descname">str2Q</tt><big>(</big><em>x</em>, <em>target=''</em><big>)</big><a class="headerlink" href="#utilities.str2Q" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a string of units unconnected to a number, returns the units as a quantity to be multiplied with the number. 
+Inverse units must be represented by a forward-slash prefix or negative power suffix, e.g. inverse square seconds may be &#8220;/s2&#8221; or &#8220;s-2&#8221;</p>
+<dl class="docutils">
+<dt><em>x</em></dt>
+<dd>The units as a string, e.g. str2Q(&#8216;W/m2/um&#8217;) =&gt; np.array(1.0) * W/(m**2*um)</dd>
+<dt><em>target</em></dt>
+<dd>The target units as a string if rescaling is necessary, e.g. str2Q(&#8216;Wm-2um-1&#8217;,target=&#8217;erg/s/cm2/cm&#8217;) =&gt; np.array(10000000.0) * erg/(cm**3*s)</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.sxg2deg">
+<tt class="descclassname">utilities.</tt><tt class="descname">sxg2deg</tt><big>(</big><em>ra=''</em>, <em>dec=''</em><big>)</big><a class="headerlink" href="#utilities.sxg2deg" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="utilities.tails">
+<tt class="descclassname">utilities.</tt><tt class="descname">tails</tt><big>(</big><em>spectrum</em>, <em>model</em>, <em>plot=False</em><big>)</big><a class="headerlink" href="#utilities.tails" title="Permalink to this definition">¶</a></dt>
+<dd><p>Appends the Wein and Rayleigh-Jeans tails of the <em>model</em> to the given <em>spectrum</em></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.try_except">
+<tt class="descclassname">utilities.</tt><tt class="descname">try_except</tt><big>(</big><em>success</em>, <em>failure</em>, <em>exceptions</em><big>)</big><a class="headerlink" href="#utilities.try_except" title="Permalink to this definition">¶</a></dt>
+<dd><p>Replaces the multi-line try/except statement with a function</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.txt2dict">
+<tt class="descclassname">utilities.</tt><tt class="descname">txt2dict</tt><big>(</big><em>txtfile</em>, <em>delim=''</em>, <em>skip=</em>, <span class="optional">[</span><span class="optional">]</span><em>ignore=</em>, <span class="optional">[</span><span class="optional">]</span><em>to_list=False</em>, <em>all_str=False</em>, <em>obj_col=0</em>, <em>key_row=0</em>, <em>start=1</em><big>)</big><a class="headerlink" href="#utilities.txt2dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>For given <em>txtfile</em> returns a parent dictionary with keys from <em>obj_col</em> and child dictionaries with keys from <em>key_row</em>, delimited by <em>delim</em> character.
+Characters to <em>ignore</em>, entire lines to <em>skip</em>, and the data row to <em>start</em> at can all be specified.
+Floats and integers are returned as numbers unless <em>all_str</em> is set True.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.unc">
+<tt class="descclassname">utilities.</tt><tt class="descname">unc</tt><big>(</big><em>spectrum</em>, <em>SNR=20</em><big>)</big><a class="headerlink" href="#utilities.unc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Removes NaNs negatives and zeroes from <em>spectrum</em> arrays of form [W,F] or [W,F,E].
+Generates E at signal to noise <em>SNR</em> for [W,F] and replaces NaNs with the same for [W,F,E].</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="utilities.xl2dict">
+<tt class="descclassname">utilities.</tt><tt class="descname">xl2dict</tt><big>(</big><em>filepath</em>, <em>sheet=1</em>, <em>obj_col=0</em>, <em>key_row=0</em>, <em>start=1</em>, <em>manual_keys=''</em><big>)</big><a class="headerlink" href="#utilities.xl2dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+        </div>
+        <div class="sidebar">
+          <h3>Table Of Contents</h3>
+          <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="BDdb.html">BDdb module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">utilities module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="astrotools.html">astrotools module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="load_db.html">load_db module</a></li>
+</ul>
+
+          <h3 style="margin-top: 1.5em;">Search</h3>
+          <form class="search" action="search.html" method="get">
+            <input type="text" name="q" />
+            <input type="submit" value="Go" />
+            <input type="hidden" name="check_keywords" value="yes" />
+            <input type="hidden" name="area" value="default" />
+          </form>
+          <p class="searchtip" style="font-size: 90%">
+            Enter search terms or a module, class or function name.
+          </p>
+        </div>
+        <div class="clearer"></div>
+      </div>
+    </div>
+
+    <div class="footer-wrapper">
+      <div class="footer">
+        <div class="left">
+          <a href="BDdb.html" title="BDdb module"
+             >previous</a> |
+          <a href="astrotools.html" title="astrotools module"
+             >next</a> |
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |
+          <a href="genindex.html" title="General Index"
+             >index</a>
+            <br/>
+            <a href="sources/utilities.txt"
+               rel="nofollow">Show Source</a>
+        </div>
+
+        <div class="right">
+          
+    <div class="footer">
+        &copy; Copyright 2014, BDNYC.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.2.
+    </div>
+        </div>
+        <div class="clearer"></div>
+      </div>
+    </div>
+
+  </body>
+</html>
