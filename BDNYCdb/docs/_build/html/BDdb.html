@@ -1,0 +1,587 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>BDdb module &mdash; BDNYCdb 0.1.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="BDNYCdb 0.1.0 documentation" href="index.html"/>
+        <link rel="next" title="utilities module" href="utilities.html"/>
+        <link rel="prev" title="Welcome to BDNYCdb’s documentation!" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> BDNYCdb
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">BDdb module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="utilities.html">utilities module</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">BDNYCdb</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>BDdb module</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/BDdb.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="module-BDdb">
+<span id="bddb-module"></span><h1>BDdb module<a class="headerlink" href="#module-BDdb" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="BDdb.adapt_array">
+<code class="descclassname">BDdb.</code><code class="descname">adapt_array</code><span class="sig-paren">(</span><em>arr</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#adapt_array"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.adapt_array" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adapts a Numpy array into an ARRAY string to put into the database.</p>
+<dl class="docutils">
+<dt>arr: array</dt>
+<dd>The Numpy array to be adapted into an ARRAY type that can be inserted into a SQL file.</dd>
+</dl>
+<dl class="docutils">
+<dt>ARRAY</dt>
+<dd>The adapted array object</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="BDdb.adapt_header">
+<code class="descclassname">BDdb.</code><code class="descname">adapt_header</code><span class="sig-paren">(</span><em>header</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#adapt_header"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.adapt_header" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adapts a FITS header into a HEADER string to put into the database.</p>
+<dl class="docutils">
+<dt>header: fits.header</dt>
+<dd>The FITS header to be adapted into a HEADER type that can be inserted into a SQL file.</dd>
+</dl>
+<dl class="docutils">
+<dt>HEADER</dt>
+<dd>The adapted header object</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="BDdb.clean_header">
+<code class="descclassname">BDdb.</code><code class="descname">clean_header</code><span class="sig-paren">(</span><em>fitsPath</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#clean_header"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.clean_header" title="Permalink to this definition">¶</a></dt>
+<dd><p>Clean illegal characters from keywords, insert END card, and rewrite header.</p>
+<dl class="docutils">
+<dt>fitsPath: str</dt>
+<dd>The path of the FITS file to be repaired.</dd>
+</dl>
+<dl class="docutils">
+<dt>fits.header</dt>
+<dd>The FITS header with an END card inserted and illegal characters removed from keywords.</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="BDdb.compare_records">
+<code class="descclassname">BDdb.</code><code class="descname">compare_records</code><span class="sig-paren">(</span><em>db, table, columns, old, new, options=['r', 'c', 'k', 'sql'], delete=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#compare_records"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.compare_records" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compares similar records and prompts the user to make decisions about keeping, updating, or modifying records in question.</p>
+<dl class="docutils">
+<dt>table: str</dt>
+<dd>The name of the table whose records are being compared.</dd>
+<dt>columns: list</dt>
+<dd>The list of columns across which the comparison should be made.</dd>
+<dt>old: (str, int, float, blob)</dt>
+<dd>The value of the record with the lower id.</dd>
+<dt>new: (str, int, float, blob)</dt>
+<dd>The value of the record with the higher id.</dd>
+<dt>options: list</dt>
+<dd>The allowed options: &#8216;r&#8217; for replace, &#8216;c&#8217; for complete, &#8216;k&#8217; for keep, &#8216;sql&#8217; for raw SQL input.</dd>
+<dt>delete: bool</dt>
+<dd>Delete the record with the higher id.</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="BDdb.convert_array">
+<code class="descclassname">BDdb.</code><code class="descname">convert_array</code><span class="sig-paren">(</span><em>array</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#convert_array"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.convert_array" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts an ARRAY string stored in the database back into a Numpy array.</p>
+<dl class="docutils">
+<dt>array: ARRAY</dt>
+<dd>The array object to be converted back into a Numpy array.</dd>
+</dl>
+<dl class="docutils">
+<dt>array</dt>
+<dd>The converted Numpy array.</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="BDdb.convert_header">
+<code class="descclassname">BDdb.</code><code class="descname">convert_header</code><span class="sig-paren">(</span><em>header</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#convert_header"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.convert_header" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a HEADER string stored in the database back into a FITS header.</p>
+<dl class="docutils">
+<dt>header: HEADER</dt>
+<dd>The header object to be converted back into a FITS header.</dd>
+</dl>
+<dl class="docutils">
+<dt>fits.header</dt>
+<dd>The converted FITS header.</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="BDdb.convert_spectrum">
+<code class="descclassname">BDdb.</code><code class="descname">convert_spectrum</code><span class="sig-paren">(</span><em>url</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#convert_spectrum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.convert_spectrum" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="BDdb.get_db">
+<em class="property">class </em><code class="descclassname">BDdb.</code><code class="descname">get_db</code><span class="sig-paren">(</span><em>dbpath</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="BDdb.get_db.add_ascii">
+<code class="descname">add_ascii</code><span class="sig-paren">(</span><em>asciiPath, source_id, header_chars=['#'], start=0, snrPath='', headerPath='', wavelength_units='', flux_units='', publication_id='', obs_date='', wavelength_order='', instrument_id='', telescope_id='', mode_id='', regime='', airmass=0, comment=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.add_ascii"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.add_ascii" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds an ascii spectrum to the <em>spectra</em> table given an <strong>asciiPath</strong>. Any <em>spectra</em> table columns besides <em>wavelength</em>, <em>flux</em>, <em>unc</em>, <em>snr</em> arrays can be specified as arguments.</p>
+<dl class="docutils">
+<dt>asciiPath: str</dt>
+<dd>The path to the ascii file with the wavelength, flux and (optional) uncertainty data</dd>
+<dt>source_id: int</dt>
+<dd>The id from the SOURCES table of the object to which the spectrum will be associated.</dd>
+<dt>header_chars: list</dt>
+<dd>If a line begins with any character in this list, that text will be used to generate a FITS header for the spectrum.</dd>
+<dt>start: int</dt>
+<dd>The index of the line after the last header line that begins the data to be saved.</dd>
+<dt>snrPath: str (optional)</dt>
+<dd>The path to the separate ascii file with the signal to noise values. Must be the same length as the wavelength and flux columns in the asciiPath file.</dd>
+<dt>headerPath: str (optional)</dt>
+<dd>The path to the FITS file that contains the header information to be stored with the spectrum.</dd>
+<dt>wavelength_units: str (optional)</dt>
+<dd>The wavelength units of the spectrum, e.g. &#8216;um&#8217;, &#8216;A&#8217;, &#8216;nm&#8217;</dd>
+<dt>flux_units: str (optional)</dt>
+<dd>The flux units of the spectrum, e.g. &#8216;erg/s/cm2/A&#8217;, &#8216;W m-2 um-1&#8217;</dd>
+<dt>publication_id: int (optional)</dt>
+<dd>The id from the PUBLICATIONS table that indicates the reference for the spectrum</dd>
+<dt>obs_date: str (optional)</dt>
+<dd>The date of the observation</dd>
+<dt>wavelength_order: int (optional)</dt>
+<dd>For high resolution spectra, the order of the observation, e.g. &#8216;65&#8217; for NIRSPEC order 65. Leave blank for low and medium resolution spectra.</dd>
+<dt>instrument_id: int (optional)</dt>
+<dd>The id from the INSTRUMENTS table used to take the spectrum</dd>
+<dt>telescope_id: int (optional)</dt>
+<dd>The id from the TELESCOPES table used to take the spectrum</dd>
+<dt>mode_id: int (optional)</dt>
+<dd>The id from the MODES table used to take the spectrum, if applicable</dd>
+<dt>regime: str (optional)</dt>
+<dd>The regime of the spectrum, e.g. &#8216;OPT&#8217;,&#8217;NIR&#8217; or &#8216;MIR&#8217;</dd>
+<dt>airmass: float (optional)</dt>
+<dd>The airmass at the time of observation</dd>
+<dt>comment: str (optional)</dt>
+<dd>Any comments about the spectrum that might be useful to future users.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.add_data">
+<code class="descname">add_data</code><span class="sig-paren">(</span><em>ascii</em>, <em>table</em>, <em>delimiter='|'</em>, <em>multiband=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.add_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.add_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds data in <strong>ascii</strong> file to the specified database <strong>table</strong>. Note column names (row 1 of ascii file) must match table fields to insert, however order and completeness don&#8217;t matter.</p>
+<dl class="docutils">
+<dt>ascii: str</dt>
+<dd>The path to the ascii file to be read in.</dd>
+<dt>table: str</dt>
+<dd>The name of the table into which the data should be inserted</dd>
+<dt>delimiter: str</dt>
+<dd>The string to use as the delimiter when parsing the ascii file</dd>
+<dt>multiband: bool</dt>
+<dd>Digest columns of multiple photometric measurements (e.g. J, H, Ks) into individual rows of data for database insertion</dd>
+</dl>
+<p>None</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.add_fits">
+<code class="descname">add_fits</code><span class="sig-paren">(</span><em>fitsPath</em>, <em>source_id</em>, <em>unc_fitsPath=''</em>, <em>wavelength_units=''</em>, <em>flux_units=''</em>, <em>publication_id=''</em>, <em>obs_date=''</em>, <em>wavelength_order=''</em>, <em>regime=''</em>, <em>instrument_id=''</em>, <em>telescope_id=''</em>, <em>mode_id=''</em>, <em>airmass=0</em>, <em>comment=''</em>, <em>wlog=False</em>, <em>SDSS=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.add_fits"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.add_fits" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks the header of the <strong>fitsFile</strong> and inserts the data with <strong>source_id</strong>.</p>
+<dl class="docutils">
+<dt>fitsPath: str</dt>
+<dd>The path to the FITS file with the wavelength, flux and (optional) uncertainty data</dd>
+<dt>source_id: int</dt>
+<dd>The id from the SOURCES table of the object to which the spectrum will be associated.</dd>
+<dt>unc_fitsPath: str</dt>
+<dd>The path to the separate FITS file with the uncertainty values. Must be the same length as the wavelength and flux arrays in the fitsPath file.</dd>
+<dt>wavelength_units: str (optional)</dt>
+<dd>The wavelength units of the spectrum, e.g. &#8216;um&#8217;, &#8216;A&#8217;, &#8216;nm&#8217;</dd>
+<dt>flux_units: str (optional)</dt>
+<dd>The flux units of the spectrum, e.g. &#8216;erg/s/cm2/A&#8217;, &#8216;W m-2 um-1&#8217;</dd>
+<dt>publication_id: int (optional)</dt>
+<dd>The id from the PUBLICATIONS table that indicates the reference for the spectrum</dd>
+<dt>obs_date: str (optional)</dt>
+<dd>The date of the observation</dd>
+<dt>wavelength_order: int (optional)</dt>
+<dd>For high resolution spectra, the order of the observation, e.g. &#8216;65&#8217; for NIRSPEC order 65. Leave blank for low and medium resolution spectra.</dd>
+<dt>instrument_id: int (optional)</dt>
+<dd>The id from the INSTRUMENTS table used to take the spectrum</dd>
+<dt>telescope_id: int (optional)</dt>
+<dd>The id from the TELESCOPES table used to take the spectrum</dd>
+<dt>mode_id: int (optional)</dt>
+<dd>The id from the MODES table used to take the spectrum, if applicable</dd>
+<dt>regime: str (optional)</dt>
+<dd>The regime of the spectrum, e.g. &#8216;OPT&#8217;,&#8217;NIR&#8217; or &#8216;MIR&#8217;</dd>
+<dt>airmass: float (optional)</dt>
+<dd>The airmass at the time of observation</dd>
+<dt>comment: str (optional)</dt>
+<dd>Any comments about the spectrum that might be useful to future users.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.add_numpy">
+<code class="descname">add_numpy</code><span class="sig-paren">(</span><em>wav</em>, <em>flx</em>, <em>err</em>, <em>snr</em>, <em>filename</em>, <em>source_id</em>, <em>wavelength_units=''</em>, <em>flux_units=''</em>, <em>publication_id=''</em>, <em>obs_date=''</em>, <em>wavelength_order=''</em>, <em>regime=''</em>, <em>instrument_id=''</em>, <em>telescope_id=''</em>, <em>mode_id=''</em>, <em>airmass=0</em>, <em>comment=''</em>, <em>headerPath=''</em>, <em>wlog=False</em>, <em>SDSS=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.add_numpy"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.add_numpy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generic function to insert spectra formatted as numpy arrays. Useful if the .fits file format is unusual (for instance, Magellan II Clay MIKE data) and needs to be extracted in some custom way.</p>
+<dl class="docutils">
+<dt>wav: array</dt>
+<dd>The Numpy wavelength array</dd>
+<dt>flx: array</dt>
+<dd>The Numpy flux array</dd>
+<dt>err: array</dt>
+<dd>The Numpy uncertainty array</dd>
+<dt>snr: array</dt>
+<dd>The Numpy signal to noise array</dd>
+<dt>filename: str</dt>
+<dd>The filename from which the data was taken</dd>
+<dt>source_id: int</dt>
+<dd>The id from the SOURCES table of the object to which the spectrum will be associated.</dd>
+<dt>wavelength_units: str (optional)</dt>
+<dd>The wavelength units of the spectrum, e.g. &#8216;um&#8217;, &#8216;A&#8217;, &#8216;nm&#8217;</dd>
+<dt>flux_units: str (optional)</dt>
+<dd>The flux units of the spectrum, e.g. &#8216;erg/s/cm2/A&#8217;, &#8216;W m-2 um-1&#8217;</dd>
+<dt>publication_id: int (optional)</dt>
+<dd>The id from the PUBLICATIONS table that indicates the reference for the spectrum</dd>
+<dt>obs_date: str (optional)</dt>
+<dd>The date of the observation</dd>
+<dt>wavelength_order: int (optional)</dt>
+<dd>For high resolution spectra, the order of the observation, e.g. &#8216;65&#8217; for NIRSPEC order 65. Leave blank for low and medium resolution spectra.</dd>
+<dt>instrument_id: int (optional)</dt>
+<dd>The id from the INSTRUMENTS table used to take the spectrum</dd>
+<dt>telescope_id: int (optional)</dt>
+<dd>The id from the TELESCOPES table used to take the spectrum</dd>
+<dt>mode_id: int (optional)</dt>
+<dd>The id from the MODES table used to take the spectrum, if applicable</dd>
+<dt>regime: str (optional)</dt>
+<dd>The regime of the spectrum, e.g. &#8216;OPT&#8217;,&#8217;NIR&#8217; or &#8216;MIR&#8217;</dd>
+<dt>airmass: float (optional)</dt>
+<dd>The airmass at the time of observation</dd>
+<dt>comment: str (optional)</dt>
+<dd>Any comments about the spectrum that might be useful to future users.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.clean_up">
+<code class="descname">clean_up</code><span class="sig-paren">(</span><em>table</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.clean_up"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.clean_up" title="Permalink to this definition">¶</a></dt>
+<dd><p>Removes exact duplicates, blank records or data without a <em>source_id</em> from the specified <strong>table</strong>. Then finds possible duplicates and prompts for conflict resolution.</p>
+<dl class="docutils">
+<dt>table: str</dt>
+<dd>The name of the table to remove duplicates, blanks, and data without source attributions.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.edit_columns">
+<code class="descname">edit_columns</code><span class="sig-paren">(</span><em>table</em>, <em>columns</em>, <em>types</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.edit_columns"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.edit_columns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rearrange, add or delete columns from database <strong>table</strong> with desired ordered list of <strong>columns</strong> and corresponding data <strong>types</strong>.</p>
+<dl class="docutils">
+<dt>table: str</dt>
+<dd>The name of the table to modify</dd>
+<dt>columns: list</dt>
+<dd>A list of the columns in the order in which they are to appear in the SQL table</dd>
+<dt>types: list</dt>
+<dd>A list of the types corresponding to each column in the columns list above.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.header">
+<code class="descname">header</code><span class="sig-paren">(</span><em>spectrum_id_or_path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.header"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.header" title="Permalink to this definition">¶</a></dt>
+<dd><p>Prints the header information for the given <strong>spectrum_id_or_path</strong>.</p>
+<dl class="docutils">
+<dt>spectrum_id_or_path: (int, str)</dt>
+<dd>The id from the SPECTRA table or the path to the FITS file of the spectrum header to print.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.identify">
+<code class="descname">identify</code><span class="sig-paren">(</span><em>search</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.identify"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.identify" title="Permalink to this definition">¶</a></dt>
+<dd><p>For <strong>search</strong> input of (ra,dec) decimal degree tuple, i.e. &#8216;(12.3456,-65.4321)&#8217;, returns all sources within 1 arcminute.
+For <strong>search</strong> input of text string, i.e. &#8216;vb10&#8217;, returns all sources with case-insensitive partial text matches in <em>names</em> or <em>designation</em> columns.</p>
+<dl class="docutils">
+<dt>search: (str, tuple)</dt>
+<dd>The text or coordinate tuple to search the SOURCES table with.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.inventory">
+<code class="descname">inventory</code><span class="sig-paren">(</span><em>ID</em>, <em>verbose=True</em>, <em>plot=False</em>, <em>data=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.inventory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.inventory" title="Permalink to this definition">¶</a></dt>
+<dd><p>Prints a summary of all objects in the database. Input string or list of strings in <strong>ID</strong> or <strong>unum</strong> for specific objects.</p>
+<dl class="docutils">
+<dt>ID: (int, list)</dt>
+<dd>The id or list of ids from the SOURCES table whose data across all tables is to be printed.</dd>
+<dt>verbose: bool</dt>
+<dd>Prints all data from all tables if True else prints a data summary.</dd>
+<dt>plot: bool</dt>
+<dd>Plots all spectra for the object.</dd>
+<dt>data: bool</dt>
+<dd>If ID is a list and data is True, returns the results of the SOURCES table search.</dd>
+</dl>
+<dl class="docutils">
+<dt>dict</dt>
+<dd>If ID is a list and data is True, returns the results of the summary SQL query for all given source_id.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.lookup">
+<code class="descname">lookup</code><span class="sig-paren">(</span><em>table</em>, <em>ids=None</em>, <em>concatenate=''</em>, <em>delim='/'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.lookup"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.lookup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Quickly look up records from the specified <em>table</em> and list <em>ids</em> to limit results. Specify column values to <em>concatenate</em> into a string.</p>
+<dl class="docutils">
+<dt>table: str</dt>
+<dd>The name of the table to perform a lookup on.</dd>
+<dt>ids: (int, list)</dt>
+<dd>An id or list of ids to lookup.</dd>
+<dt>concatenate: str</dt>
+<dd>The name of the column whose values should be joined by delim and returned.</dd>
+<dt>delim: str</dt>
+<dd>If concatenate, the delimiter to be used to join the results.</dd>
+</dl>
+<dl class="docutils">
+<dt>(list, str)</dt>
+<dd>A list of the complete record(s) or a concatenated string from the desired table with the given ids.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.merge">
+<code class="descname">merge</code><span class="sig-paren">(</span><em>conflicted</em>, <em>tables=[]</em>, <em>diff_only=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.merge"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.merge" title="Permalink to this definition">¶</a></dt>
+<dd><p>Merges specific <strong>tables</strong> or all tables of <strong>conflicted</strong> databse into the master database.</p>
+<dl class="docutils">
+<dt>conflicted: str</dt>
+<dd>The path of the SQL database to be merged into the master.</dd>
+<dt>tables: list (optional)</dt>
+<dd>The list of tables to merge. If None, all tables are merged.</dd>
+<dt>diff_only: bool</dt>
+<dd>If True, only prints the differences of each table and doesn&#8217;t actually merge anything.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.modify">
+<code class="descname">modify</code><span class="sig-paren">(</span><em>SQL</em>, <em>params=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.modify"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.modify" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wrapper for CRUD operations to make them distinct from queries and automatically pass commit() method to cursor.</p>
+<dl class="docutils">
+<dt>SQL: str</dt>
+<dd>The SQL query to execute</dd>
+<dt>params: sequence</dt>
+<dd>Mimicks the native parameter substitution of sqlite3</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.output_spectrum">
+<code class="descname">output_spectrum</code><span class="sig-paren">(</span><em>spectrum_id</em>, <em>filepath</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.output_spectrum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.output_spectrum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Prints a file of the spectrum with id <strong>spectrum_id</strong> to an ascii file with specified <strong>filepath</strong>.</p>
+<dl class="docutils">
+<dt>spectrum_id: int</dt>
+<dd>The id from the SPECTRA table of the spectrum to print to file.</dd>
+<dt>filepath: str</dt>
+<dd>The path of the file to print the data to.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.plot_spectrum">
+<code class="descname">plot_spectrum</code><span class="sig-paren">(</span><em>spectrum_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.plot_spectrum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.plot_spectrum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plots spectrum <strong>ID</strong> from SPECTRA table.</p>
+<dl class="docutils">
+<dt>spectrum_id: int</dt>
+<dd>The id from the SPECTRA table of the spectrum to plot.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="BDdb.get_db.query">
+<code class="descname">query</code><span class="sig-paren">(</span><em>SQL</em>, <em>params=''</em>, <em>DICT=False</em>, <em>fetch='all'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/BDdb.html#get_db.query"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#BDdb.get_db.query" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wrapper for cursors so data can be retrieved as a list or dictionary from same method</p>
+<dl class="docutils">
+<dt>SQL: str</dt>
+<dd>The SQL query to execute</dd>
+<dt>params: sequence</dt>
+<dd>Mimicks the native parameter substitution of sqlite3</dd>
+<dt>DICT: bool</dt>
+<dd>Returns the data as a dictionary if True, else a list</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="utilities.html" class="btn btn-neutral float-right" title="utilities module" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="Welcome to BDNYCdb’s documentation!" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Joe Filippazzo.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.1.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
