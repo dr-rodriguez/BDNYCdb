@@ -30,15 +30,14 @@ def table_add(tab, data, col):
     x = []
     for i in range(len(data)):
 
-        # If the particular key is not present, create an empty value (used for photometry tables)
+        # If the particular key is not present, use a place-holder value (used for photometry tables)
         if col not in data[i]:
-            temp = ''
+            temp = -999.
         else:
             temp = data[i][col]
 
         # Fix up None elements
-        if temp is None:
-            temp = ''
+        if temp is None: temp = ''
 
         x.append(temp)
 
@@ -46,7 +45,7 @@ def table_add(tab, data, col):
     tab.add_column(Column(x, name=col))
 
 
-def dict_tovot(tabdata, tabname='votable.xml', phot=False):
+def dict_tovot(tabdata, tabname='votable.xml', phot=False, binary=True):
     """
     Converts dictionary table **tabdata** to a VOTable with name **tabname**
 
@@ -58,6 +57,8 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False):
       The name of the VOTable to be created
     phot: bool
       Parameter specifying if the table contains photometry to be merged
+    binary: bool
+      Parameter specifying if the VOTable should be saved as a binary. This is necessary for tables with lots of text columns.
 
     Returns
     -------
@@ -78,19 +79,29 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False):
     if phot:
         tabdata = photparse(tabdata)
 
+        colnames = tabdata[0].keys()
+
         for i in range(len(tabdata)):
             tmpcol = tabdata[i].keys()
             for elem in tmpcol:
                 if elem not in colnames: colnames.append(elem)
 
+        # No need for band column any more
+        try:
+            colnames.remove('band')
+        except ValueError:
+            pass
+
     # Run through all the columns and create them
-    for elem in colnames:
-        table_add(t, tabdata, elem)
+    for elem in colnames: table_add(t, tabdata, elem)
 
     # Output to a file
     print 'Creating table...'
     votable = from_table(t)
-    votable.set_all_tables_format('binary')
+
+    # Required in some cases (ie, lots of text columns)
+    if binary: votable.set_all_tables_format('binary')
+
     votable.to_xml(tabname)
 
     print 'Table created:', tabname
@@ -145,14 +156,9 @@ def photparse(tab):
     """
 
     # Loop through the table and grab unique band names and source IDs
-    bandnames = []
     uniqueid = []
     for i in range(len(tab)):
-        tmp = tab[i]['band']
         tmpid = tab[i]['source_id']
-
-        if tmp not in bandnames:
-            bandnames.append(tmp)
 
         if tmpid not in uniqueid:
             uniqueid.append(tmpid)
