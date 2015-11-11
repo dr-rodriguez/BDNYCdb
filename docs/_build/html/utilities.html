@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>utilities module &mdash; BDNYCdb 0.1.0 documentation</title>
+  <title>utilities module &mdash; The BDNYC Data Archive 0.1.0 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="BDNYCdb 0.1.0 documentation" href="index.html"/>
+    <link rel="top" title="The BDNYC Data Archive 0.1.0 documentation" href="index.html"/>
+        <link rel="next" title="votools module" href="votools.html"/>
         <link rel="prev" title="BDdb module" href="BDdb.html"/> 
 
   
@@ -49,7 +50,7 @@
           
 
           
-            <a href="index.html" class="icon icon-home"> BDNYCdb
+            <a href="index.html" class="icon icon-home"> The BDNYC Data Archive
           
 
           
@@ -83,6 +84,7 @@
                 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="BDdb.html">BDdb module</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="">utilities module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="votools.html">votools module</a></li>
 </ul>
 
             
@@ -96,7 +98,7 @@
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
         <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="index.html">BDNYCdb</a>
+        <a href="index.html">The BDNYC Data Archive</a>
       </nav>
 
 
@@ -131,40 +133,40 @@
 <span id="utilities-module"></span><h1>utilities module<a class="headerlink" href="#module-utilities" title="Permalink to this headline">¶</a></h1>
 <dl class="function">
 <dt id="utilities.Jy2mag">
-<code class="descclassname">utilities.</code><code class="descname">Jy2mag</code><span class="sig-paren">(</span><em>band</em>, <em>jy</em>, <em>jy_unc</em>, <em>filter_dict=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#Jy2mag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.Jy2mag" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">Jy2mag</code><span class="sig-paren">(</span><em>band</em>, <em>jy</em>, <em>jy_unc</em>, <em>filter_dict=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.Jy2mag" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.blackbody">
-<code class="descclassname">utilities.</code><code class="descname">blackbody</code><span class="sig-paren">(</span><em>lam</em>, <em>T</em>, <em>Flam=False</em>, <em>radius=1</em>, <em>dist=10</em>, <em>emitted=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#blackbody"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.blackbody" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">blackbody</code><span class="sig-paren">(</span><em>lam</em>, <em>T</em>, <em>Flam=False</em>, <em>radius=1</em>, <em>dist=10</em>, <em>emitted=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.blackbody" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a wavelength array [um] and temperature [K], returns an array of Planck function values in [erg s-1 cm-2 A-1]</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.contour_plot">
-<code class="descclassname">utilities.</code><code class="descname">contour_plot</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>best=False</em>, <em>figsize=(8</em>, <em>8)</em>, <em>levels=20</em>, <em>cmap=&lt;matplotlib.colors.LinearSegmentedColormap object&gt;</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#contour_plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.contour_plot" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">contour_plot</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>best=False</em>, <em>figsize=(8</em>, <em>8)</em>, <em>levels=20</em>, <em>cmap=&lt;matplotlib.colors.LinearSegmentedColormap object&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.contour_plot" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.deg2sxg">
-<code class="descclassname">utilities.</code><code class="descname">deg2sxg</code><span class="sig-paren">(</span><em>ra=''</em>, <em>dec=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#deg2sxg"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.deg2sxg" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">deg2sxg</code><span class="sig-paren">(</span><em>ra=''</em>, <em>dec=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.deg2sxg" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.dict2txt">
-<code class="descclassname">utilities.</code><code class="descname">dict2txt</code><span class="sig-paren">(</span><em>DICT</em>, <em>writefile</em>, <em>column1='-'</em>, <em>delim='\t'</em>, <em>digits=''</em>, <em>order=''</em>, <em>colsort=''</em>, <em>row2=''</em>, <em>preamble=''</em>, <em>postamble=''</em>, <em>empties=True</em>, <em>append=False</em>, <em>all_str=False</em>, <em>literal=False</em>, <em>blanks='\\\\nodata'</em>, <em>LaTeX=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#dict2txt"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.dict2txt" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">dict2txt</code><span class="sig-paren">(</span><em>DICT</em>, <em>writefile</em>, <em>column1='-'</em>, <em>delim='\t'</em>, <em>digits=''</em>, <em>order=''</em>, <em>colsort=''</em>, <em>row2=''</em>, <em>preamble=''</em>, <em>postamble=''</em>, <em>empties=True</em>, <em>append=False</em>, <em>all_str=False</em>, <em>literal=False</em>, <em>blanks='\\\\nodata'</em>, <em>LaTeX=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.dict2txt" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a nested dictionary <em>DICT</em>, writes a .txt file with keys as columns.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.distance">
-<code class="descclassname">utilities.</code><code class="descname">distance</code><span class="sig-paren">(</span><em>coord1</em>, <em>coord2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#distance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.distance" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">distance</code><span class="sig-paren">(</span><em>coord1</em>, <em>coord2</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.distance" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given n-dimensional coordinates of two points, returns the distance between them</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.filter_info">
-<code class="descclassname">utilities.</code><code class="descname">filter_info</code><span class="sig-paren">(</span><em>band</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#filter_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.filter_info" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">filter_info</code><span class="sig-paren">(</span><em>band</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.filter_info" title="Permalink to this definition">¶</a></dt>
 <dd><p>Effective, min, and max wavelengths in [um] and zeropoint in [erg s-1 cm-2 A-1] and [photon s-1 cm-2 A-1] for SDSS, Bessel, 2MASS, IRAC and WISE filters IN THE VEGA SYSTEM. Values from SVO filter profile service.</p>
 <dl class="docutils">
 <dt><em>band</em></dt>
@@ -174,8 +176,8 @@
 
 <dl class="function">
 <dt id="utilities.find">
-<code class="descclassname">utilities.</code><code class="descname">find</code><span class="sig-paren">(</span><em>filename</em>, <em>tree</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#find"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.find" title="Permalink to this definition">¶</a></dt>
-<dd><p>For given filename and directory tree, returns the path to the file. 
+<code class="descclassname">utilities.</code><code class="descname">find</code><span class="sig-paren">(</span><em>filename</em>, <em>tree</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.find" title="Permalink to this definition">¶</a></dt>
+<dd><p>For given filename and directory tree, returns the path to the file.
 For only file extension given as filename, returns list of paths to all files with that extnsion in that directory tree.</p>
 <dl class="docutils">
 <dt><em>filename</em></dt>
@@ -187,68 +189,68 @@ For only file extension given as filename, returns list of paths to all files wi
 
 <dl class="function">
 <dt id="utilities.flux2mag">
-<code class="descclassname">utilities.</code><code class="descname">flux2mag</code><span class="sig-paren">(</span><em>band</em>, <em>f</em>, <em>sig_f=''</em>, <em>photon=False</em>, <em>filter_dict=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#flux2mag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.flux2mag" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">flux2mag</code><span class="sig-paren">(</span><em>band</em>, <em>f</em>, <em>sig_f=''</em>, <em>photon=False</em>, <em>filter_dict=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.flux2mag" title="Permalink to this definition">¶</a></dt>
 <dd><p>For given band and flux returns the magnitude value (and uncertainty if <em>sig_f</em>)</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.flux_calibrate">
-<code class="descclassname">utilities.</code><code class="descname">flux_calibrate</code><span class="sig-paren">(</span><em>mag</em>, <em>dist</em>, <em>sig_m=''</em>, <em>sig_d=''</em>, <em>scale_to=&lt;Quantity 10.0 pc&gt;</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#flux_calibrate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.flux_calibrate" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">flux_calibrate</code><span class="sig-paren">(</span><em>mag</em>, <em>dist</em>, <em>sig_m=''</em>, <em>sig_d=''</em>, <em>scale_to=&lt;Quantity 10.0 pc&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.flux_calibrate" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.get_filters">
-<code class="descclassname">utilities.</code><code class="descname">get_filters</code><span class="sig-paren">(</span><em>filter_directories=['/Users/Joe/Documents/Python/Filters/2MASS/', '/Users/Joe/Documents/Python/Filters/SDSS/', '/Users/Joe/Documents/Python/Filters/WISE/', '/Users/Joe/Documents/Python/Filters/IRAC/', '/Users/Joe/Documents/Python/Filters/MIPS/', '/Users/Joe/Documents/Python/Filters/HST/', '/Users/Joe/Documents/Python/Filters/Bessel/', '/Users/Joe/Documents/Python/Filters/MKO/', '/Users/Joe/Documents/Python/Filters/GALEX/', '/Users/Joe/Documents/Python/Filters/DENIS/', '/Users/Joe/Documents/Python/Filters/GAIA/', '/Users/Joe/Documents/Python/Filters/DES/'], systems=['2MASS', 'SDSS', 'WISE', 'IRAC', 'MIPS', 'HST', 'Bessel', 'MKO', 'GALEX', 'DENIS', 'GAIA', 'DES']</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#get_filters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.get_filters" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">get_filters</code><span class="sig-paren">(</span><em>filter_directories=['/Users/Joe/Documents/Python/Filters/2MASS/', '/Users/Joe/Documents/Python/Filters/SDSS/', '/Users/Joe/Documents/Python/Filters/WISE/', '/Users/Joe/Documents/Python/Filters/IRAC/', '/Users/Joe/Documents/Python/Filters/MIPS/', '/Users/Joe/Documents/Python/Filters/HST/', '/Users/Joe/Documents/Python/Filters/Bessel/', '/Users/Joe/Documents/Python/Filters/MKO/', '/Users/Joe/Documents/Python/Filters/GALEX/', '/Users/Joe/Documents/Python/Filters/DENIS/', '/Users/Joe/Documents/Python/Filters/GAIA/', '/Users/Joe/Documents/Python/Filters/DES/'], systems=['2MASS', 'SDSS', 'WISE', 'IRAC', 'MIPS', 'HST', 'Bessel', 'MKO', 'GALEX', 'DENIS', 'GAIA', 'DES']</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.get_filters" title="Permalink to this definition">¶</a></dt>
 <dd><p>Grabs all the .txt spectral response curves and returns a dictionary of wavelength array [um], filter response [unitless], effective, min and max wavelengths [um], and zeropoint [erg s-1 cm-2 A-1].</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.goodness">
-<code class="descclassname">utilities.</code><code class="descname">goodness</code><span class="sig-paren">(</span><em>spec1</em>, <em>spec2</em>, <em>array=False</em>, <em>exclude=[]</em>, <em>filt_dict=None</em>, <em>weighting=True</em>, <em>verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#goodness"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.goodness" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">goodness</code><span class="sig-paren">(</span><em>spec1</em>, <em>spec2</em>, <em>array=False</em>, <em>exclude=[]</em>, <em>filt_dict=None</em>, <em>weighting=True</em>, <em>verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.goodness" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.group">
-<code class="descclassname">utilities.</code><code class="descname">group</code><span class="sig-paren">(</span><em>lst</em>, <em>n</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#group"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.group" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">group</code><span class="sig-paren">(</span><em>lst</em>, <em>n</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.group" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.group_spectra">
-<code class="descclassname">utilities.</code><code class="descname">group_spectra</code><span class="sig-paren">(</span><em>spectra</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#group_spectra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.group_spectra" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">group_spectra</code><span class="sig-paren">(</span><em>spectra</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.group_spectra" title="Permalink to this definition">¶</a></dt>
 <dd><p>Puts a list of <em>spectra</em> into groups with overlapping wavelength arrays</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.idx_exclude">
-<code class="descclassname">utilities.</code><code class="descname">idx_exclude</code><span class="sig-paren">(</span><em>x</em>, <em>exclude</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#idx_exclude"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.idx_exclude" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">idx_exclude</code><span class="sig-paren">(</span><em>x</em>, <em>exclude</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.idx_exclude" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.idx_include">
-<code class="descclassname">utilities.</code><code class="descname">idx_include</code><span class="sig-paren">(</span><em>x</em>, <em>include</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#idx_include"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.idx_include" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">idx_include</code><span class="sig-paren">(</span><em>x</em>, <em>include</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.idx_include" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.inject_average">
-<code class="descclassname">utilities.</code><code class="descname">inject_average</code><span class="sig-paren">(</span><em>spectrum</em>, <em>position</em>, <em>direction</em>, <em>n=10</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#inject_average"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.inject_average" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">inject_average</code><span class="sig-paren">(</span><em>spectrum</em>, <em>position</em>, <em>direction</em>, <em>n=10</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.inject_average" title="Permalink to this definition">¶</a></dt>
 <dd><p>Used to smooth edges after trimming a spectrum. Injects a new data point into a <em>spectrum</em> at given <em>position</em> with flux value equal to the average of the <em>n</em> elements in the given <em>direction</em>.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.mag2flux">
-<code class="descclassname">utilities.</code><code class="descname">mag2flux</code><span class="sig-paren">(</span><em>band</em>, <em>mag</em>, <em>sig_m=''</em>, <em>photon=False</em>, <em>filter_dict=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#mag2flux"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.mag2flux" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">mag2flux</code><span class="sig-paren">(</span><em>band</em>, <em>mag</em>, <em>sig_m=''</em>, <em>photon=False</em>, <em>filter_dict=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.mag2flux" title="Permalink to this definition">¶</a></dt>
 <dd><p>For given band and magnitude returns the flux value (and uncertainty if <em>sig_m</em>) in [ergs][s-1][cm-2][A-1]</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.make_composite">
-<code class="descclassname">utilities.</code><code class="descname">make_composite</code><span class="sig-paren">(</span><em>spectra</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#make_composite"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.make_composite" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">make_composite</code><span class="sig-paren">(</span><em>spectra</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.make_composite" title="Permalink to this definition">¶</a></dt>
 <dd><p>Creates a composite spectrum from a list of overlapping <em>spectra</em></p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.manual_legend">
-<code class="descclassname">utilities.</code><code class="descname">manual_legend</code><span class="sig-paren">(</span><em>labels</em>, <em>colors</em>, <em>markers=''</em>, <em>edges=''</em>, <em>sizes=''</em>, <em>errors=''</em>, <em>styles=''</em>, <em>text_colors=''</em>, <em>fontsize=14</em>, <em>overplot=''</em>, <em>bbox_to_anchor=''</em>, <em>loc=0</em>, <em>ncol=1</em>, <em>figlegend=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#manual_legend"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.manual_legend" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">manual_legend</code><span class="sig-paren">(</span><em>labels</em>, <em>colors</em>, <em>markers=''</em>, <em>edges=''</em>, <em>sizes=''</em>, <em>errors=''</em>, <em>styles=''</em>, <em>text_colors=''</em>, <em>fontsize=14</em>, <em>overplot=''</em>, <em>bbox_to_anchor=''</em>, <em>loc=0</em>, <em>ncol=1</em>, <em>figlegend=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.manual_legend" title="Permalink to this definition">¶</a></dt>
 <dd><p>Add manually created legends to plots and subplots
 <em>labels</em></p>
 <blockquote>
@@ -279,89 +281,96 @@ For only file extension given as filename, returns list of paths to all files wi
 
 <dl class="function">
 <dt id="utilities.marginalized_distribution">
-<code class="descclassname">utilities.</code><code class="descname">marginalized_distribution</code><span class="sig-paren">(</span><em>data</em>, <em>figure=''</em>, <em>xunits=''</em>, <em>yunits=''</em>, <em>xy=''</em>, <em>color='b'</em>, <em>marker='o'</em>, <em>markersize=8</em>, <em>contour=True</em>, <em>save=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#marginalized_distribution"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.marginalized_distribution" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">marginalized_distribution</code><span class="sig-paren">(</span><em>data</em>, <em>figure=''</em>, <em>xunits=''</em>, <em>yunits=''</em>, <em>xy=''</em>, <em>color='b'</em>, <em>marker='o'</em>, <em>markersize=8</em>, <em>contour=True</em>, <em>save=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.marginalized_distribution" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.modelFit">
-<code class="descclassname">utilities.</code><code class="descname">modelFit</code><span class="sig-paren">(</span><em>fit</em>, <em>spectrum</em>, <em>photometry</em>, <em>photDict</em>, <em>specDict</em>, <em>filtDict</em>, <em>d=''</em>, <em>sig_d=''</em>, <em>exclude=[]</em>, <em>plot=False</em>, <em>Rlim=(0</em>, <em>100)</em>, <em>Tlim=(700</em>, <em>3000)</em>, <em>title=''</em>, <em>weighting=True</em>, <em>verbose=False</em>, <em>save=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#modelFit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.modelFit" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">modelFit</code><span class="sig-paren">(</span><em>fit</em>, <em>spectrum</em>, <em>photometry</em>, <em>photDict</em>, <em>specDict</em>, <em>filtDict</em>, <em>d=''</em>, <em>sig_d=''</em>, <em>exclude=[]</em>, <em>plot=False</em>, <em>Rlim=(0</em>, <em>100)</em>, <em>Tlim=(700</em>, <em>3000)</em>, <em>title=''</em>, <em>weighting=True</em>, <em>verbose=False</em>, <em>save=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.modelFit" title="Permalink to this definition">¶</a></dt>
 <dd><p>For given <em>spectrum</em> [W,F,E] or dictionary of photometry, returns the best fit synthetic spectrum by varying surface gravity and effective temperature.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.modelInterp">
-<code class="descclassname">utilities.</code><code class="descname">modelInterp</code><span class="sig-paren">(</span><em>params</em>, <em>model_dict</em>, <em>filt_dict=None</em>, <em>plot=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#modelInterp"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.modelInterp" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">modelInterp</code><span class="sig-paren">(</span><em>params</em>, <em>model_dict</em>, <em>filt_dict=None</em>, <em>plot=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.modelInterp" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the interpolated model atmosphere spectrum (if model_dict==spec_dict) or photometry (if model_dict==phot_dict and filt_dict provided)</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.modelReplace">
-<code class="descclassname">utilities.</code><code class="descname">modelReplace</code><span class="sig-paren">(</span><em>spectrum</em>, <em>model</em>, <em>replace=[]</em>, <em>tails=False</em>, <em>plot=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#modelReplace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.modelReplace" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">modelReplace</code><span class="sig-paren">(</span><em>spectrum</em>, <em>model</em>, <em>replace=[]</em>, <em>tails=False</em>, <em>plot=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.modelReplace" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the given <em>spectrum</em> with the tuple termranges in <em>replace</em> replaced by the given <em>model</em>.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.montecarlo">
-<code class="descclassname">utilities.</code><code class="descname">montecarlo</code><span class="sig-paren">(</span><em>spectrum</em>, <em>modelDict</em>, <em>N=100</em>, <em>exclude=[]</em>, <em>save=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#montecarlo"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.montecarlo" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">montecarlo</code><span class="sig-paren">(</span><em>spectrum</em>, <em>modelDict</em>, <em>N=100</em>, <em>exclude=[]</em>, <em>save=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.montecarlo" title="Permalink to this definition">¶</a></dt>
 <dd><p>For given <em>spectrum</em> and dictionary of models <em>modelDict</em>, runs a Monte Carlo simulation <em>N</em> times on each model</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.multiplot">
-<code class="descclassname">utilities.</code><code class="descname">multiplot</code><span class="sig-paren">(</span><em>rows</em>, <em>columns</em>, <em>ylabel=''</em>, <em>xlabel=''</em>, <em>xlabelpad=''</em>, <em>ylabelpad=''</em>, <em>hspace=0</em>, <em>wspace=0</em>, <em>figsize=(15</em>, <em>7)</em>, <em>fontsize=22</em>, <em>sharey=True</em>, <em>sharex=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#multiplot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.multiplot" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">multiplot</code><span class="sig-paren">(</span><em>rows</em>, <em>columns</em>, <em>ylabel=''</em>, <em>xlabel=''</em>, <em>xlabelpad=''</em>, <em>ylabelpad=''</em>, <em>hspace=0</em>, <em>wspace=0</em>, <em>figsize=(15</em>, <em>7)</em>, <em>fontsize=22</em>, <em>sharey=True</em>, <em>sharex=True</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.multiplot" title="Permalink to this definition">¶</a></dt>
 <dd><p>Creates subplots with given number or <em>rows</em> and <em>columns</em>.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.norm_spec">
-<code class="descclassname">utilities.</code><code class="descname">norm_spec</code><span class="sig-paren">(</span><em>spectrum</em>, <em>template</em>, <em>exclude=[]</em>, <em>include=[]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#norm_spec"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.norm_spec" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="docutils">
-<dt>spectrum: sequence</dt>
-<dd>The [w,f] or [w,f,e] astropy quantities spectrum to normalize</dd>
-<dt>template: sequence</dt>
-<dd>The [w,f] or [w,f,e] astropy quantities spectrum to be normalized to</dd>
-<dt>exclude: sequence (optional)</dt>
-<dd>A sequence of tuples defining the wavelength ranges to exclude in the normalization</dd>
-<dt>include: sequence (optional)</dt>
-<dd>A sequence of tuples defining the wavelength ranges to include in the normalization</dd>
-</dl>
-<dl class="docutils">
-<dt>spectrum: sequence</dt>
-<dd>The normalized [w,f] or [w,f,e] astropy quantities spectrum</dd>
-</dl>
+<code class="descclassname">utilities.</code><code class="descname">norm_spec</code><span class="sig-paren">(</span><em>spectrum</em>, <em>template</em>, <em>exclude=[]</em>, <em>include=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.norm_spec" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>spectrum</strong> (<em>sequence</em>) &#8211; The [w,f] or [w,f,e] astropy quantities spectrum to normalize</li>
+<li><strong>template</strong> (<em>sequence</em>) &#8211; The [w,f] or [w,f,e] astropy quantities spectrum to be normalized to</li>
+<li><strong>exclude</strong> (<em>sequence (optional)</em>) &#8211; A sequence of tuples defining the wavelength ranges to exclude in the normalization</li>
+<li><strong>include</strong> (<em>sequence (optional)</em>) &#8211; A sequence of tuples defining the wavelength ranges to include in the normalization</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>spectrum</strong> &#8211;
+The normalized [w,f] or [w,f,e] astropy quantities spectrum</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">sequence</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.norm_to_mag">
-<code class="descclassname">utilities.</code><code class="descname">norm_to_mag</code><span class="sig-paren">(</span><em>spectrum</em>, <em>magnitude</em>, <em>band</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#norm_to_mag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.norm_to_mag" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">norm_to_mag</code><span class="sig-paren">(</span><em>spectrum</em>, <em>magnitude</em>, <em>band</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.norm_to_mag" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the flux of a given <em>spectrum</em> [W,F] normalized to the given <em>magnitude</em> in the specified photometric <em>band</em></p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.normalize">
-<code class="descclassname">utilities.</code><code class="descname">normalize</code><span class="sig-paren">(</span><em>spectra</em>, <em>template</em>, <em>composite=True</em>, <em>plot=False</em>, <em>SNR=50</em>, <em>exclude=[]</em>, <em>trim=[]</em>, <em>replace=[]</em>, <em>D_Flam=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#normalize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.normalize" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">normalize</code><span class="sig-paren">(</span><em>spectra</em>, <em>template</em>, <em>composite=True</em>, <em>plot=False</em>, <em>SNR=50</em>, <em>exclude=[]</em>, <em>trim=[]</em>, <em>replace=[]</em>, <em>D_Flam=None</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.normalize" title="Permalink to this definition">¶</a></dt>
 <dd><p>Normalizes a list of <em>spectra</em> with [W,F,E] or [W,F] to a <em>template</em> spectrum.
 Returns one normalized, composite spectrum if <em>composite</em>, else returns the list of <em>spectra</em> normalized to the <em>template</em>.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.pi2pc">
-<code class="descclassname">utilities.</code><code class="descname">pi2pc</code><span class="sig-paren">(</span><em>parallax</em>, <em>parallax_unc=0</em>, <em>pc2pi=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#pi2pc"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.pi2pc" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">pi2pc</code><span class="sig-paren">(</span><em>parallax</em>, <em>parallax_unc=0</em>, <em>pc2pi=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.pi2pc" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.poly_print">
-<code class="descclassname">utilities.</code><code class="descname">poly_print</code><span class="sig-paren">(</span><em>coeff_list</em>, <em>x='x'</em>, <em>y='y'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#poly_print"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.poly_print" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">poly_print</code><span class="sig-paren">(</span><em>coeff_list</em>, <em>x='x'</em>, <em>y='y'</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.poly_print" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.polynomial">
-<code class="descclassname">utilities.</code><code class="descname">polynomial</code><span class="sig-paren">(</span><em>n</em>, <em>m</em>, <em>sig=''</em>, <em>x='x'</em>, <em>y='y'</em>, <em>title=''</em>, <em>degree=1</em>, <em>c='k'</em>, <em>ls='--'</em>, <em>lw=2</em>, <em>legend=True</em>, <em>ax=''</em>, <em>output_data=False</em>, <em>plot_rms='0.9'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#polynomial"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.polynomial" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">polynomial</code><span class="sig-paren">(</span><em>n</em>, <em>m</em>, <em>sig=''</em>, <em>x='x'</em>, <em>y='y'</em>, <em>title=''</em>, <em>degree=1</em>, <em>c='k'</em>, <em>ls='--'</em>, <em>lw=2</em>, <em>legend=True</em>, <em>ax=''</em>, <em>output_data=False</em>, <em>plot_rms='0.9'</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.polynomial" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.printer">
-<code class="descclassname">utilities.</code><code class="descname">printer</code><span class="sig-paren">(</span><em>labels</em>, <em>values</em>, <em>format=''</em>, <em>truncate=150</em>, <em>to_txt=None</em>, <em>highlight=[]</em>, <em>skip=[]</em>, <em>empties=True</em>, <em>title=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#printer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.printer" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">printer</code><span class="sig-paren">(</span><em>labels</em>, <em>values</em>, <em>format=''</em>, <em>truncate=150</em>, <em>to_txt=None</em>, <em>highlight=[]</em>, <em>skip=[]</em>, <em>empties=True</em>, <em>title=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.printer" title="Permalink to this definition">¶</a></dt>
 <dd><p>Prints a nice table of <em>values</em> with <em>labels</em> with auto widths else maximum width if <em>same</em> else <em>col_len</em> if specified.</p>
 </dd></dl>
 
@@ -372,7 +381,7 @@ Returns one normalized, composite spectrum if <em>composite</em>, else returns t
 
 <dl class="function">
 <dt id="utilities.read_spec">
-<code class="descclassname">utilities.</code><code class="descname">read_spec</code><span class="sig-paren">(</span><em>specFiles</em>, <em>errors=True</em>, <em>atomicron=False</em>, <em>negtonan=False</em>, <em>plot=False</em>, <em>linear=False</em>, <em>wlog=False</em>, <em>verbose=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#read_spec"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.read_spec" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">read_spec</code><span class="sig-paren">(</span><em>specFiles</em>, <em>errors=True</em>, <em>atomicron=False</em>, <em>negtonan=False</em>, <em>plot=False</em>, <em>linear=False</em>, <em>wlog=False</em>, <em>verbose=True</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.read_spec" title="Permalink to this definition">¶</a></dt>
 <dd><p>(by Alejandro N <a href="#id1"><span class="problematic" id="id2">|uacute|</span></a> <a href="#id3"><span class="problematic" id="id4">|ntilde|</span></a> ez, Jocelyn Ferrara)</p>
 <p>Read spectral data from fits or ascii files. It returns a list of numpy arrays with wavelength in position 0, flux in position 1 and error values (if requested) in position 2. More than one file name can be provided simultaneously.</p>
 <p><strong>Limitations</strong>: Due to a lack of set framework for ascii file headers, this function assumes ascii files to have wavelength in column 1, flux in column 2, and (optional) error in column 3. Ascii spectra are assumed to be linear, so the kwarg <em>linear</em> is disabled for ascii files. Fits files that have multiple spectral orders will not be interpreted correctly with this function.</p>
@@ -396,20 +405,20 @@ Returns one normalized, composite spectrum if <em>composite</em>, else returns t
 
 <dl class="function">
 <dt id="utilities.rebin_spec">
-<code class="descclassname">utilities.</code><code class="descname">rebin_spec</code><span class="sig-paren">(</span><em>spec</em>, <em>wavnew</em>, <em>waveunits='um'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#rebin_spec"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.rebin_spec" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">rebin_spec</code><span class="sig-paren">(</span><em>spec</em>, <em>wavnew</em>, <em>waveunits='um'</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.rebin_spec" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.rgb_image">
-<code class="descclassname">utilities.</code><code class="descname">rgb_image</code><span class="sig-paren">(</span><em>images</em>, <em>save=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#rgb_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.rgb_image" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">rgb_image</code><span class="sig-paren">(</span><em>images</em>, <em>save=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.rgb_image" title="Permalink to this definition">¶</a></dt>
 <dd><p>Saves an RGB false color image at <em>save</em> made from a stack of three <em>images</em>
 From the APLpy (Apple Pie) module (<a class="reference external" href="http://aplpy.readthedocs.org/en/latest/howto_rgb.html">http://aplpy.readthedocs.org/en/latest/howto_rgb.html</a>)</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.sameName">
-<code class="descclassname">utilities.</code><code class="descname">sameName</code><span class="sig-paren">(</span><em>name1</em>, <em>name2</em>, <em>chars=4</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#sameName"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.sameName" title="Permalink to this definition">¶</a></dt>
-<dd><p>Boolean: Given names of two objects, checks that they have a certain number of name characters in common 
+<code class="descclassname">utilities.</code><code class="descname">sameName</code><span class="sig-paren">(</span><em>name1</em>, <em>name2</em>, <em>chars=4</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.sameName" title="Permalink to this definition">¶</a></dt>
+<dd><p>Boolean: Given names of two objects, checks that they have a certain number of name characters in common
 Note: discounts &#8216;2&#8217; in object names with &#8216;2MASS&#8217; or &#8216;2m&#8217;</p>
 <dl class="docutils">
 <dt><em>chars</em></dt>
@@ -419,25 +428,25 @@ Note: discounts &#8216;2&#8217; in object names with &#8216;2MASS&#8217; or &#82
 
 <dl class="function">
 <dt id="utilities.scrub">
-<code class="descclassname">utilities.</code><code class="descname">scrub</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#scrub"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.scrub" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">scrub</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.scrub" title="Permalink to this definition">¶</a></dt>
 <dd><p>For input data [w,f,e] or [w,f] returns the list with NaN, negative, and zero flux (and corresponsing wavelengths and errors) removed.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.separation">
-<code class="descclassname">utilities.</code><code class="descname">separation</code><span class="sig-paren">(</span><em>ra1</em>, <em>dec1</em>, <em>ra2</em>, <em>dec2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#separation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.separation" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">separation</code><span class="sig-paren">(</span><em>ra1</em>, <em>dec1</em>, <em>ra2</em>, <em>dec2</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.separation" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given coordinates <em>ra1</em>, <em>dec1</em>, <em>ra2</em>, <em>dec2</em> of two objects, returns the angular separation in arcseconds.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.smooth">
-<code class="descclassname">utilities.</code><code class="descname">smooth</code><span class="sig-paren">(</span><em>x</em>, <em>beta</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#smooth"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.smooth" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">smooth</code><span class="sig-paren">(</span><em>x</em>, <em>beta</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.smooth" title="Permalink to this definition">¶</a></dt>
 <dd><p>Smooths a spectrum <em>x</em> using a Kaiser-Bessel smoothing window of narrowness <em>beta</em> (~1 =&gt; very smooth, ~100 =&gt; not smooth)</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.specType">
-<code class="descclassname">utilities.</code><code class="descname">specType</code><span class="sig-paren">(</span><em>SpT</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#specType"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.specType" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">specType</code><span class="sig-paren">(</span><em>SpT</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.specType" title="Permalink to this definition">¶</a></dt>
 <dd><p>(By Joe Filippazzo)</p>
 <p>Converts between float and letter/number M, L, T and Y spectral types (e.g. 14.5 =&gt; &#8216;L4.5&#8217; and &#8216;T3&#8217; =&gt; 23).</p>
 <dl class="docutils">
@@ -448,14 +457,14 @@ Note: discounts &#8216;2&#8217; in object names with &#8216;2MASS&#8217; or &#82
 
 <dl class="function">
 <dt id="utilities.squaredError">
-<code class="descclassname">utilities.</code><code class="descname">squaredError</code><span class="sig-paren">(</span><em>a</em>, <em>b</em>, <em>c</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#squaredError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.squaredError" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">squaredError</code><span class="sig-paren">(</span><em>a</em>, <em>b</em>, <em>c</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.squaredError" title="Permalink to this definition">¶</a></dt>
 <dd><p>Computes the squared error of two arrays. Pass to scipy.optimize.fmin() to find least square or use scipy.optimize.leastsq()</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.str2Q">
-<code class="descclassname">utilities.</code><code class="descname">str2Q</code><span class="sig-paren">(</span><em>x</em>, <em>target=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#str2Q"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.str2Q" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a string of units unconnected to a number, returns the units as a quantity to be multiplied with the number. 
+<code class="descclassname">utilities.</code><code class="descname">str2Q</code><span class="sig-paren">(</span><em>x</em>, <em>target=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.str2Q" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a string of units unconnected to a number, returns the units as a quantity to be multiplied with the number.
 Inverse units must be represented by a forward-slash prefix or negative power suffix, e.g. inverse square seconds may be &#8220;/s2&#8221; or &#8220;s-2&#8221;</p>
 <dl class="docutils">
 <dt><em>x</em></dt>
@@ -467,29 +476,29 @@ Inverse units must be represented by a forward-slash prefix or negative power su
 
 <dl class="function">
 <dt id="utilities.sxg2deg">
-<code class="descclassname">utilities.</code><code class="descname">sxg2deg</code><span class="sig-paren">(</span><em>ra=''</em>, <em>dec=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#sxg2deg"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.sxg2deg" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">sxg2deg</code><span class="sig-paren">(</span><em>ra=''</em>, <em>dec=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.sxg2deg" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.tails">
-<code class="descclassname">utilities.</code><code class="descname">tails</code><span class="sig-paren">(</span><em>spectrum</em>, <em>model</em>, <em>plot=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#tails"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.tails" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">tails</code><span class="sig-paren">(</span><em>spectrum</em>, <em>model</em>, <em>plot=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.tails" title="Permalink to this definition">¶</a></dt>
 <dd><p>Appends the Wein and Rayleigh-Jeans tails of the <em>model</em> to the given <em>spectrum</em></p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.trim_spectrum">
-<code class="descclassname">utilities.</code><code class="descname">trim_spectrum</code><span class="sig-paren">(</span><em>spectrum</em>, <em>regions</em>, <em>smooth_edges=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#trim_spectrum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.trim_spectrum" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">trim_spectrum</code><span class="sig-paren">(</span><em>spectrum</em>, <em>regions</em>, <em>smooth_edges=False</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.trim_spectrum" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="utilities.try_except">
-<code class="descclassname">utilities.</code><code class="descname">try_except</code><span class="sig-paren">(</span><em>success</em>, <em>failure</em>, <em>exceptions</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#try_except"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.try_except" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">try_except</code><span class="sig-paren">(</span><em>success</em>, <em>failure</em>, <em>exceptions</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.try_except" title="Permalink to this definition">¶</a></dt>
 <dd><p>Replaces the multi-line try/except statement with a function</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.txt2dict">
-<code class="descclassname">utilities.</code><code class="descname">txt2dict</code><span class="sig-paren">(</span><em>txtfile</em>, <em>delim=''</em>, <em>skip=[]</em>, <em>ignore=[]</em>, <em>to_list=False</em>, <em>all_str=False</em>, <em>obj_col=0</em>, <em>key_row=0</em>, <em>start=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#txt2dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.txt2dict" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">txt2dict</code><span class="sig-paren">(</span><em>txtfile</em>, <em>delim=''</em>, <em>skip=[]</em>, <em>ignore=[]</em>, <em>to_list=False</em>, <em>all_str=False</em>, <em>obj_col=0</em>, <em>key_row=0</em>, <em>start=1</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.txt2dict" title="Permalink to this definition">¶</a></dt>
 <dd><p>For given <em>txtfile</em> returns a parent dictionary with keys from <em>obj_col</em> and child dictionaries with keys from <em>key_row</em>, delimited by <em>delim</em> character.
 Characters to <em>ignore</em>, entire lines to <em>skip</em>, and the data row to <em>start</em> at can all be specified.
 Floats and integers are returned as numbers unless <em>all_str</em> is set True.</p>
@@ -497,14 +506,14 @@ Floats and integers are returned as numbers unless <em>all_str</em> is set True.
 
 <dl class="function">
 <dt id="utilities.unc">
-<code class="descclassname">utilities.</code><code class="descname">unc</code><span class="sig-paren">(</span><em>spectrum</em>, <em>SNR=20</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#unc"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.unc" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">unc</code><span class="sig-paren">(</span><em>spectrum</em>, <em>SNR=20</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.unc" title="Permalink to this definition">¶</a></dt>
 <dd><p>Removes NaNs negatives and zeroes from <em>spectrum</em> arrays of form [W,F] or [W,F,E].
 Generates E at signal to noise <em>SNR</em> for [W,F] and replaces NaNs with the same for [W,F,E].</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="utilities.xl2dict">
-<code class="descclassname">utilities.</code><code class="descname">xl2dict</code><span class="sig-paren">(</span><em>filepath</em>, <em>sheet=1</em>, <em>obj_col=0</em>, <em>key_row=0</em>, <em>start=1</em>, <em>manual_keys=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utilities.html#xl2dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utilities.xl2dict" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">utilities.</code><code class="descname">xl2dict</code><span class="sig-paren">(</span><em>filepath</em>, <em>sheet=1</em>, <em>obj_col=0</em>, <em>key_row=0</em>, <em>start=1</em>, <em>manual_keys=''</em><span class="sig-paren">)</span><a class="headerlink" href="#utilities.xl2dict" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </div>
@@ -515,6 +524,8 @@ Generates E at signal to noise <em>SNR</em> for [W,F] and replaces NaNs with the
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="votools.html" class="btn btn-neutral float-right" title="votools module" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="BDdb.html" class="btn btn-neutral" title="BDdb module" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>

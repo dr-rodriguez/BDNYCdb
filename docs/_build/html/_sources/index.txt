@@ -1,10 +1,10 @@
-.. BDNYCdb documentation master file, created by
-   sphinx-quickstart on Sat Nov  7 22:11:57 2015.
+.. The BDNYC Data Archive documentation master file, created by
+   sphinx-quickstart on Wed Nov 11 11:02:29 2015.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to BDNYCdb's documentation!
-===================================
+Welcome to The BDNYC Data Archive's documentation!
+==================================================
 
 Contents:
 
@@ -13,7 +13,7 @@ Contents:
 
    BDdb
    utilities
-
+   votools
 
 Indices and tables
 ==================
