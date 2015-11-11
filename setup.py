@@ -13,7 +13,7 @@ from os import path
 
 setup(
     name='BDNYCdb',
-    version='0.1.0.post2',
+    version='0.1.0.post3',
     description='A Python library to communicate with the BDNYC Data Archive SQL file.',
     url='https://github.com/BDNYC/BDNYCdb',
     author='Joe Filippazzo',
