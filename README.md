@@ -17,4 +17,6 @@ from BDNYCdb import BDdb
 db = BDdb.get_db('/path/to/bdnyc198.db')
 ```
 
+Then read [the documentation](http://bdnycdocs.s3-website-us-east-1.amazonaws.com/index.html) to get started!
+
 ## Enjoy!
