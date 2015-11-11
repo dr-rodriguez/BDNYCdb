@@ -58,7 +58,8 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False, binary=True):
     phot: bool
       Parameter specifying if the table contains photometry to be merged
     binary: bool
-      Parameter specifying if the VOTable should be saved as a binary. This is necessary for tables with lots of text columns.
+      Parameter specifying if the VOTable should be saved as a binary.
+      This is necessary for tables with lots of text columns.
 
     Returns
     -------
@@ -99,7 +100,7 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False, binary=True):
     print 'Creating table...'
     votable = from_table(t)
 
-    # Required in some cases (ie, lots of text columns)
+    # Required in some cases (ie, for lots of text columns)
     if binary: votable.set_all_tables_format('binary')
 
     votable.to_xml(tabname)
@@ -107,15 +108,19 @@ def dict_tovot(tabdata, tabname='votable.xml', phot=False, binary=True):
     print 'Table created:', tabname
 
 
-def photaddline(tab, id):
+def photaddline(tab, sourceid):
     """
-    Loop through the dictionary list **tab** creating a line for the source specified in **id**
+    Loop through the dictionary list **tab** creating a line for the source specified in **sourceid**
 
-    :param tab:
+    Parameters
+    ----------
+    tab:
       Dictionary list of all the photometry data
-    :param id:
+    sourceid:
       ID of source in the photometry table (source_id)
-    :return:
+
+    Returns
+    -------
       Dictionary with all the data for the specified source
     """
 
@@ -124,11 +129,13 @@ def photaddline(tab, id):
     for i in range(len(tab)):
 
         # If not working on the same source, continue
-        if tab[i]['source_id'] != id:
+        if tab[i]['source_id'] != sourceid:
             continue
 
+        # Check column names and create new ones for band-specific ones
         for elem in colnames:
-            if elem not in ['comments','epoch','instrument_id','magnitude','magnitude_unc','publication_id','system','telescope_id']:
+            if elem not in ['comments', 'epoch', 'instrument_id', 'magnitude', 'magnitude_unc', 'publication_id',
+                            'system', 'telescope_id']:
                 tmpdict[elem] = tab[i][elem]
             elif elem == 'band':
                 continue
@@ -165,11 +172,8 @@ def photparse(tab):
 
     # Loop over unique id and create a new table for each element in it
     newtab = []
-    for id in uniqueid:
-        tmpdict = photaddline(tab, id)
+    for sourceid in uniqueid:
+        tmpdict = photaddline(tab, sourceid)
         newtab.append(tmpdict)
 
     return newtab
-
-
-
